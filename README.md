@@ -24,7 +24,7 @@ cron job that eventually deletes something it should not have.
 | | |
 | --- | --- |
 | **Somewhere to carry from** | a directory, watched or scanned or both |
-| **Somewhere to carry to** | S3-compatible storage, an HTTP server the fleet already runs, or another directory. Several at once |
+| **Somewhere to carry to** | S3, Google, Azure, an HTTP or WebDAV server, a machine over SSH, or another directory. Several at once |
 | **When** | an interval, a count, a size, or the disk getting tight -- whichever comes first |
 | **Then** | keep it, delete it, delete it after a while, or move it somewhere else |
 
@@ -144,17 +144,24 @@ report, err := s.Once(ctx)   // or s.Run(ctx) to keep going
 | `naming` | what a thing is called once it is somewhere else |
 | `spool` | the engine |
 
-Adding a kind of sink is implementing two methods and calling `sink.Register`
+Adding a kind of sink is implementing one method and calling `sink.Register`
 from your package's `init`. Importing your package is then what makes
 `type: yours` mean something -- see `cmd/kinds.go`, which is the whole of what
-this build can do. There are conformance suites for both halves, so an
-implementation can be held to the contract rather than to the doc comments:
+this build can do. There are conformance suites for sources, sinks and
+journals, so an implementation can be held to the contract rather than to the
+doc comments:
 
 ```go
 func TestMySink(t *testing.T) {
 	sinktest.Suite(t, func(t *testing.T) sink.Sink { return New(...) })
 }
 ```
+
+**The sinks that need a third-party SDK are modules of their own** --
+`sink/s3`, `sink/gcs`, `sink/azure`, `sink/sftp` -- so importing `spool` does
+not put three cloud SDKs in your `go.sum`. Measured on a consumer importing
+`spool` and `sink/dir`: 47 lines, none of them AWS, against 85 with 38 of them
+AWS before the split. See [docs/EXTENDING.md](docs/EXTENDING.md).
 
 ## Building it
 
@@ -169,6 +176,15 @@ There is a hundred per cent statement coverage gate, and the reason is in
 `scripts/test.sh`: this is a thing that deletes files, and every branch nobody
 has run is a branch that will first run on a machine holding the only copy of
 something.
+
+## Documents
+
+| | |
+| --- | --- |
+| [docs/SINKS.md](docs/SINKS.md) | every destination, every setting, and **what each one's read-back actually checks** |
+| [docs/DESIGN.md](docs/DESIGN.md) | the ordering everything rests on, and what is true after a crash at each point |
+| [docs/EXTENDING.md](docs/EXTENDING.md) | adding a kind, and releasing one |
+| [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md) | |
 
 ## What it does not do
 

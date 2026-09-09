@@ -2,8 +2,8 @@
 #
 # Nothing here is on that was not written down. There are no spools, so this
 # configuration carries nothing; it is here to say what may be written and what
-# each thing means. `wick config` prints what the app ended up with, which is
-# how to check.
+# each thing means; docs/SINKS.md says the rest. `wick config` prints what the
+# app ended up with, which is how to check.
 #
 # What is said here can be overruled, and the last word wins:
 #
@@ -67,6 +67,10 @@ sinks: {}
   #   # wherever it is available.
   #   access_key_id: "$${env:S3_KEY_ID}"
   #   secret_access_key: "$${env:S3_KEY_SECRET}"
+  #   # Or a profile, or a role to take on once the above has said who this is:
+  #   profile: robot
+  #   assume_role_arn: arn:aws:iam::123456789012:role/recordings
+  #   role_session_name: thor-top
   #   part_size: 16MiB     # how a large object is broken up
   #   concurrency: 4       # how many parts are in the air at once
   #   rate_limit: 20MiB    # bytes a second; no limit when unset
@@ -78,7 +82,9 @@ sinks: {}
   #   endpoint: https://collector.example.com/drop
   #   method: PUT                        # or POST
   #   headers:
-  #     Authorization: "Bearer $${env:COLLECTOR_TOKEN}"
+  #     X-Robot: thor-top
+  #   username: wick                     # or a token_file, read every request
+  #   password: "$${env:COLLECTOR_PASSWORD}"
   #   digest_header: X-Content-Sha256    # unset checks the length alone
   #   rate_limit: 20MiB
   #   ca_file: /etc/ssl/certs/internal.pem
@@ -86,6 +92,48 @@ sinks: {}
   #   # is picked up without a restart.
   #   cert_file: /var/lib/wick/client.crt
   #   key_file: /var/lib/wick/client.key
+
+  # Google Cloud Storage. Said nothing about credentials means workload
+  # identity on GKE or the metadata server on Compute Engine, which is the way
+  # round to prefer.
+  #
+  # cloud:
+  #   type: gcs
+  #   bucket: recordings
+  #   prefix: robots
+  #   credentials_file: /var/lib/wick/key.json
+  #   chunk_size: 16MiB
+  #   rate_limit: 20MiB
+
+  # Azure Blob Storage. Said nothing means a managed identity.
+  #
+  # cloud:
+  #   type: azure
+  #   account: wickstorage
+  #   container: recordings
+  #   connection_string: "$${env:AZURE_CONNECTION_STRING}"
+  #   block_size: 1MiB
+  #   concurrency: 1
+
+  # A server over SSH: the one a building already has. known_hosts is required,
+  # because a host key nobody checks is a sink that will one day be somebody
+  # else.
+  #
+  # onsite:
+  #   type: sftp
+  #   address: files.example.com:22
+  #   user: wick
+  #   key_file: /var/lib/wick/id_ed25519
+  #   known_hosts: /etc/ssh/ssh_known_hosts
+  #   path: /srv/recordings
+
+  # Nextcloud, ownCloud, the web front end of a NAS.
+  #
+  # nas:
+  #   type: webdav
+  #   endpoint: https://nas.example.com/remote.php/dav/files/wick
+  #   username: wick
+  #   password: "$${env:NAS_PASSWORD}"
 
   # A directory. A mounted NAS, a second disk, or a drive somebody walks out to
   # the machine with -- which on a robot with no uplink worth the name is still
