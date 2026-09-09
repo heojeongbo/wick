@@ -46,6 +46,15 @@ type Source struct {
 	// failItem is yielded against the named item during a scan, which is the
 	// shape of "this one could not be looked at but the rest could".
 	failItem map[string]error
+	// swap is what a later read of a key gives back instead, and opens counts
+	// how many reads there have been.
+	swap  map[string]swap
+	opens map[string]int
+}
+
+type swap struct {
+	at   int
+	data []byte
 }
 
 func New() *Source {
@@ -119,6 +128,23 @@ func (s *Source) FailMove(key string, err error) {
 	s.failMove = set(s.failMove, key, err)
 }
 
+// SwapOnOpen makes the nth read of key, counting from one, give back something
+// else -- and every read after it.
+//
+// It is how "the file was written again between one read of it and the next"
+// is arranged. That happens for real -- a naming template that asks for the
+// hash reads the file twice -- and the engine has to notice rather than send
+// one file under the other one's name.
+func (s *Source) SwapOnOpen(key string, nth int, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.swap == nil {
+		s.swap = map[string]swap{}
+	}
+	s.swap[key] = swap{at: nth, data: data}
+}
+
 func set(m map[string]error, k string, v error) map[string]error {
 	if m == nil {
 		m = map[string]error{}
@@ -179,6 +205,20 @@ func (s *Source) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	it, ok := s.items[key]
 	if !ok {
 		return nil, &fs.PathError{Op: "open", Path: key, Err: fs.ErrNotExist}
+	}
+
+	if s.opens == nil {
+		s.opens = map[string]int{}
+	}
+	s.opens[key]++
+
+	if w, ok := s.swap[key]; ok && s.opens[key] >= w.at {
+		// The file was written again, and from here on it is this.
+		delete(s.swap, key)
+		it.data = w.data
+		s.items[key] = it
+
+		return io.NopCloser(bytes.NewReader(w.data)), nil
 	}
 
 	return io.NopCloser(bytes.NewReader(it.data)), nil
