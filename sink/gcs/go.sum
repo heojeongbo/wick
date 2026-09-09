@@ -65,8 +65,8 @@ github.com/googleapis/enterprise-certificate-proxy v0.3.17 h1:73NfMHdiqo9JFU9+7a
 github.com/googleapis/enterprise-certificate-proxy v0.3.17/go.mod h1:rSEsBUemEBZEexP2y6jPp16LUmUbjmSbcPMQizR0o4k=
 github.com/googleapis/gax-go/v2 v2.23.0 h1:Tchl7qkvE7Ip3y+ztvNufYFvkfqTe7NfLTYGIdJRLuE=
 github.com/googleapis/gax-go/v2 v2.23.0/go.mod h1:rBQKOVJCdb8IFEzg+FCwlt1LP/xMDGuqUXhUG+XMXEg=
-github.com/heojeongbo/wick v0.2.0 h1:Y+FL4ZehpDdNPY4f03M2hVPmxe9nF8DEpjU5/XeJZMo=
-github.com/heojeongbo/wick v0.2.0/go.mod h1:yPIHmbLeDwmMYQpffklamSBgc7w8W1bHxgb9J4pqrm0=
+github.com/heojeongbo/wick v0.2.1 h1:JwjZOzS4ZNNNk4f62uf+J+ntGDNrcHj093Z1VOUk6nY=
+github.com/heojeongbo/wick v0.2.1/go.mod h1:MgihApBs3qsFbOAXU4KzUOYOSLEvpmapbUaXu08Ewb4=
 github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878 h1:A/2LM0h6a8pyXO9jVqUAQv0ZOLCv4hna6lFwtEN2dD4=
 github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878/go.mod h1:v3+tOhGZhT6JQ/ZYncEQryo23ApoN03Ez4G2BHp2SWM=
 github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 h1:GFCKgmp0tecUJ0sJuv4pzYCqS9+RGSn52M3FUwPs+uo=

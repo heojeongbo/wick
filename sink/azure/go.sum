@@ -20,8 +20,8 @@ github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63Y
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/heojeongbo/wick v0.2.0 h1:Y+FL4ZehpDdNPY4f03M2hVPmxe9nF8DEpjU5/XeJZMo=
-github.com/heojeongbo/wick v0.2.0/go.mod h1:yPIHmbLeDwmMYQpffklamSBgc7w8W1bHxgb9J4pqrm0=
+github.com/heojeongbo/wick v0.2.1 h1:JwjZOzS4ZNNNk4f62uf+J+ntGDNrcHj093Z1VOUk6nY=
+github.com/heojeongbo/wick v0.2.1/go.mod h1:MgihApBs3qsFbOAXU4KzUOYOSLEvpmapbUaXu08Ewb4=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
 github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0SNc=

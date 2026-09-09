@@ -1,7 +1,7 @@
 github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
 github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
-github.com/heojeongbo/wick v0.2.0 h1:Y+FL4ZehpDdNPY4f03M2hVPmxe9nF8DEpjU5/XeJZMo=
-github.com/heojeongbo/wick v0.2.0/go.mod h1:yPIHmbLeDwmMYQpffklamSBgc7w8W1bHxgb9J4pqrm0=
+github.com/heojeongbo/wick v0.2.1 h1:JwjZOzS4ZNNNk4f62uf+J+ntGDNrcHj093Z1VOUk6nY=
+github.com/heojeongbo/wick v0.2.1/go.mod h1:MgihApBs3qsFbOAXU4KzUOYOSLEvpmapbUaXu08Ewb4=
 github.com/kr/fs v0.1.0 h1:Jskdu9ieNAYnjxsi0LbQp1ulIKZV1LAFgK1tWhpZgl8=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
 github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878 h1:A/2LM0h6a8pyXO9jVqUAQv0ZOLCv4hna6lFwtEN2dD4=
