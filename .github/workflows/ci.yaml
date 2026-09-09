@@ -22,6 +22,7 @@ on:
       - Dockerfile
       - go.mod
       - go.sum
+      - go.work
       - main.go
       - scripts/**
   pull_request:
@@ -44,8 +45,38 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
-      - run: go mod tidy -diff
+          cache-dependency-path: |
+            go.sum
+            sink/s3/go.sum
+      - name: every module says what it needs
+        run: |
+          set -eux
+          for m in . sink/s3; do (cd "$m" && go mod tidy -diff); done
+
+  # Each module, built as somebody who imports it would build it: without the
+  # workspace, against the versions its own go.mod records.
+  #
+  # This is the one thing the workspace hides. The binary imports the sinks and
+  # the sinks import the root, so after a change to `sink` or `size` each
+  # submodule is pointing at a root that predates it. From a checkout that is
+  # invisible and harmless; to somebody who runs `go get` on one of them it is
+  # not. This job is what says so.
+  modules:
+    runs-on: ubuntu-latest
+    env:
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            sink/s3/go.sum
+      - name: each module on its own
+        run: |
+          set -eux
+          for m in . sink/s3; do (cd "$m" && go build ./...); done
 
   build:
     runs-on: ubuntu-latest

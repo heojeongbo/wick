@@ -479,3 +479,17 @@ func TestAStoreThatCannotBeWorkedOut(t *testing.T) {
 	_, err := s3.New(t.Context(), s3.Options{Bucket: "b"})
 	x.ErrorContains(err, "work out how to reach the store")
 }
+
+// Importing this package is what makes `type: s3` mean something, and the
+// package that holds the registry cannot check that: it is the one this
+// depends on, so importing this back into its tests would put the AWS SDK into
+// the test dependencies of the package that exists to keep it out of them.
+func TestItRegistersItself(t *testing.T) {
+	x := require.New(t)
+
+	x.Contains(sink.Kinds(), s3.Kind)
+
+	spec, err := sink.NewSpec(s3.Kind)
+	x.NoError(err)
+	x.IsType(&s3.Spec{}, spec)
+}

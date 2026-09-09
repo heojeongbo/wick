@@ -8,9 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/heojeongbo/wick/sink"
+	// The kinds this module holds, and no others. s3 lives in a module of its
+	// own *because* it depends on this one; importing it back here would put
+	// the SDK into the test dependencies of the package that exists to keep it
+	// out of them.
 	_ "github.com/heojeongbo/wick/sink/dir"
 	_ "github.com/heojeongbo/wick/sink/http"
-	_ "github.com/heojeongbo/wick/sink/s3"
 )
 
 type spec struct {
@@ -23,12 +26,12 @@ func (s *spec) New(ctx context.Context) (sink.Sink, error) { return nil, nil } /
 
 func TestRegistry(t *testing.T) {
 	// Importing the package that implements a kind is what makes it available;
-	// the three above are imported for that and for nothing else. It is also
-	// what lets a build that does not want the cloud SDK leave the s3 one out.
+	// the two above are imported for that and for nothing else. It is also
+	// what lets a build that does not want a cloud SDK leave that sink out.
 	t.Run("every kind this build was given can be made", func(t *testing.T) {
 		x := require.New(t)
 
-		x.Equal([]string{"dir", "http", "s3"}, sink.Kinds())
+		x.Subset(sink.Kinds(), []string{"dir", "http"})
 
 		for _, kind := range sink.Kinds() {
 			s, err := sink.NewSpec(kind)
@@ -42,7 +45,7 @@ func TestRegistry(t *testing.T) {
 		_, err := sink.NewSpec("nope")
 		x.ErrorContains(err, `"nope"`)
 		x.ErrorContains(err, "sink")
-		x.ErrorContains(err, "s3")
+		x.ErrorContains(err, "dir")
 	})
 	t.Run("one that is registered is one that is made", func(t *testing.T) {
 		x := require.New(t)
@@ -58,8 +61,8 @@ func TestRegistry(t *testing.T) {
 	t.Run("two things under one name is not a state to run in", func(t *testing.T) {
 		x := require.New(t)
 
-		x.PanicsWithValue(`sink: two kinds are called "s3"`, func() {
-			sink.Register("s3", func() sink.Spec { return &spec{} })
+		x.PanicsWithValue(`sink: two kinds are called "dir"`, func() {
+			sink.Register("dir", func() sink.Spec { return &spec{} })
 		})
 	})
 }

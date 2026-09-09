@@ -6,8 +6,12 @@ FROM golang:1.26 AS base
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
-RUN go mod download
+# The workspace and every module's go.mod first, so that a change to the source
+# does not send the whole dependency graph down the wire again. The sinks that
+# need a third-party SDK are modules of their own; see scripts/test.sh.
+COPY go.work go.mod go.sum ./
+COPY sink/s3/go.mod sink/s3/go.sum ./sink/s3/
+RUN go mod download && (cd sink/s3 && go mod download)
 
 COPY . .
 ENV CGO_ENABLED=0
