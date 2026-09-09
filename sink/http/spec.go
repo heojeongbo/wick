@@ -23,9 +23,16 @@ type Spec struct {
 	Endpoint string `yaml:"endpoint"`
 	// Method is PUT when it is not said; POST is the other one servers ask for.
 	Method string `yaml:"method"`
-	// Headers are sent with every request. A bearer token goes here, written
-	// as "${env:...}" so that it is named in the file and not held in it.
+	// Headers are sent with every request, as they are written. Anything the
+	// far end wants to be told and this has no name for; write a secret as
+	// "${env:...}" so that it is named in the file and not held in it.
 	Headers map[string]string `yaml:"headers"`
+	// Username and Password are Basic authentication.
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	// TokenFile holds a bearer token and is read at every request, so one that
+	// something else renews is picked up without a restart.
+	TokenFile string `yaml:"token_file"`
 	// DigestHeader is the header the content hash is sent in and read back
 	// out of. Unset means the read-back checks the length alone.
 	DigestHeader string `yaml:"digest_header"`
@@ -46,9 +53,14 @@ type Spec struct {
 
 func (s *Spec) New(ctx context.Context) (sink.Sink, error) {
 	return New(Options{
-		Endpoint:     s.Endpoint,
-		Method:       s.Method,
-		Headers:      s.Headers,
+		Endpoint: s.Endpoint,
+		Method:   s.Method,
+		Auth: Auth{
+			Headers:   s.Headers,
+			Username:  s.Username,
+			Password:  s.Password,
+			TokenFile: s.TokenFile,
+		},
 		DigestHeader: s.DigestHeader,
 		RateLimit:    s.RateLimit.Int64(),
 		TLS: TLS{

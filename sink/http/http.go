@@ -44,9 +44,8 @@ type Options struct {
 	// is the other one servers ask for.
 	Method string
 
-	// Headers are sent with every request. This is where a bearer token goes,
-	// and anything else the far end wants to be told.
-	Headers map[string]string
+	// Auth is who the requests say they are from.
+	Auth Auth
 
 	// DigestHeader is the header the content hash is sent in, and the one a
 	// read-back reads it back out of. Unset means the hash is not sent and the
@@ -66,10 +65,77 @@ type Options struct {
 	Client *http.Client
 }
 
+// Auth is who a request says it is from.
+//
+// The three ways are separate fields rather than one header map, because a
+// deployment that has to spell "Basic " and base64 by hand is a deployment that
+// will one day spell it wrong, and the mistake looks like a server that is
+// refusing rather than a client that is asking wrongly.
+type Auth struct {
+	// Headers are sent with every request, as they are written. Anything the
+	// far end wants to be told and this has no name for.
+	Headers map[string]string
+
+	// Username and Password are Basic authentication.
+	Username string
+	Password string
+
+	// TokenFile holds a bearer token, and is read at every request.
+	//
+	// Read every time rather than once, for the same reason the client
+	// certificate is: on a machine like this it is something else's job to
+	// renew it, and holding the first one means working until it expires and
+	// then failing until somebody restarts the daemon.
+	TokenFile string
+}
+
+// Check says whether this can be meant.
+func (a Auth) Check() error {
+	basic := a.Username != "" || a.Password != ""
+	switch {
+	case basic && a.TokenFile != "":
+		// Both would set Authorization and one would quietly win.
+		return fmt.Errorf("a username and a token file are two answers to the same question; give one")
+
+	case a.Password != "" && a.Username == "":
+		return fmt.Errorf("a password without a username is not a way to say who is asking")
+	}
+
+	return nil
+}
+
+// Apply puts it on a request.
+//
+// Exported because the webdav sink is a different package and asks the same
+// question of the same servers; two ways of spelling a bearer token in one
+// repository is one too many.
+func (a Auth) Apply(req *http.Request) error {
+	for k, v := range a.Headers {
+		req.Header.Set(k, v)
+	}
+
+	switch {
+	case a.Username != "":
+		req.SetBasicAuth(a.Username, a.Password)
+
+	case a.TokenFile != "":
+		b, err := os.ReadFile(a.TokenFile)
+		if err != nil {
+			return z.Err(err, "read the token %q", a.TokenFile)
+		}
+
+		// Trimmed, because a token in a file is a token with a newline after
+		// it, and a server sent one is a server that says no.
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(b)))
+	}
+
+	return nil
+}
+
 type Sink struct {
 	base    *url.URL
 	method  string
-	headers map[string]string
+	auth    Auth
 	digestH string
 	rate    int64
 	client  *http.Client
@@ -98,6 +164,10 @@ func New(o Options) (*Sink, error) {
 		return nil, fmt.Errorf("%q is not a way to put something somewhere; it is PUT or POST", m)
 	}
 
+	if err := o.Auth.Check(); err != nil {
+		return nil, err
+	}
+
 	c := o.Client
 	if c == nil {
 		t, err := NewTransport(o.TLS)
@@ -110,7 +180,7 @@ func New(o Options) (*Sink, error) {
 	return &Sink{
 		base:    u,
 		method:  m,
-		headers: o.Headers,
+		auth:    o.Auth,
 		digestH: o.DigestHeader,
 		rate:    o.RateLimit,
 		client:  c,
@@ -123,7 +193,7 @@ func (s *Sink) Put(ctx context.Context, name string, r io.Reader, want sink.Meta
 		return err
 	}
 
-	req := request(ctx, s.method, u)
+	req := Request(ctx, s.method, u)
 	req.Body = io.NopCloser(throttle.Reader(ctx, r, s.rate))
 
 	// Said rather than left to be guessed. A body of unknown length is sent
@@ -133,8 +203,8 @@ func (s *Sink) Put(ctx context.Context, name string, r io.Reader, want sink.Meta
 		req.ContentLength = want.Size
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	for k, v := range s.headers {
-		req.Header.Set(k, v)
+	if err := s.auth.Apply(req); err != nil {
+		return err
 	}
 	if s.digestH != "" && want.Digest != "" {
 		req.Header.Set(s.digestH, want.Digest)
@@ -159,9 +229,9 @@ func (s *Sink) Stat(ctx context.Context, name string) (sink.Meta, error) {
 		return sink.Meta{}, err
 	}
 
-	req := request(ctx, http.MethodHead, u)
-	for k, v := range s.headers {
-		req.Header.Set(k, v)
+	req := Request(ctx, http.MethodHead, u)
+	if err := s.auth.Apply(req); err != nil {
+		return sink.Meta{}, err
 	}
 
 	res, err := s.client.Do(req)
@@ -204,13 +274,13 @@ func (s *Sink) url(name string) (*url.URL, error) {
 	return &u, nil
 }
 
-// request builds one by hand rather than through [http.NewRequestWithContext].
+// Request builds one by hand rather than through [http.NewRequestWithContext].
 //
 // That function's only job here would be to parse a string this package has
 // just finished assembling from a [url.URL] it parsed at startup, and to check
 // a method it has already checked. It cannot fail, and a branch that cannot
 // fail is a branch nothing ever runs -- so there is no branch.
-func request(ctx context.Context, method string, u *url.URL) *http.Request {
+func Request(ctx context.Context, method string, u *url.URL) *http.Request {
 	return (&http.Request{
 		Method:     method,
 		URL:        u,

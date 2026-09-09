@@ -170,7 +170,7 @@ func TestPut(t *testing.T) {
 		s := newSink(t, wickhttp.Options{
 			Endpoint:     serve(t, st),
 			Method:       http.MethodPost,
-			Headers:      map[string]string{"Authorization": "Bearer sesame"},
+			Auth:         wickhttp.Auth{Headers: map[string]string{"Authorization": "Bearer sesame"}},
 			DigestHeader: "X-Content-Sha256",
 		})
 
@@ -365,16 +365,113 @@ func TestSpec(t *testing.T) {
 	st := newStore()
 	s, err := (&wickhttp.Spec{
 		Endpoint: serve(t, st), Method: http.MethodPost,
-		Headers:      map[string]string{"Authorization": "Bearer sesame"},
+		Headers:      map[string]string{"X-Robot": "thor-top"},
+		Username:     "wick",
+		Password:     "sesame",
 		DigestHeader: "X-Content-Sha256", RateLimit: 1024,
 	}).New(t.Context())
 	x.NoError(err)
 	x.NoError(s.Put(t.Context(), "a.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1}))
 	x.Equal([]byte("x"), st.objs["a.rec"])
+	x.Equal("thor-top", st.hdrs["a.rec"].Get("X-Robot"))
+
+	user, _, _ := basicOf(st.hdrs["a.rec"])
+	x.Equal("wick", user)
+
+	_, err = (&wickhttp.Spec{Endpoint: "https://host", Username: "a", TokenFile: "/t"}).New(t.Context())
+	x.ErrorContains(err, "two answers")
 
 	_, err = (&wickhttp.Spec{}).New(t.Context())
 	x.ErrorContains(err, "where to put things")
 
 	_, err = (&wickhttp.Spec{Endpoint: "https://host", CertFile: "only.pem"}).New(t.Context())
 	x.ErrorContains(err, "go together")
+}
+
+// Three ways to say who is asking. They are separate fields rather than one
+// header map because a deployment that has to spell "Basic " and base64 by hand
+// is a deployment that will one day spell it wrong, and the mistake looks like
+// a server refusing rather than a client asking wrongly.
+func TestSayingWhoIsAsking(t *testing.T) {
+	t.Run("a username and a password are Basic", func(t *testing.T) {
+		x := require.New(t)
+
+		st := newStore()
+		s := newSink(t, wickhttp.Options{
+			Endpoint: serve(t, st),
+			Auth:     wickhttp.Auth{Username: "wick", Password: "sesame"},
+		})
+
+		x.NoError(s.Put(t.Context(), "a.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1}))
+
+		user, pass, ok := basicOf(st.hdrs["a.rec"])
+		x.True(ok)
+		x.Equal("wick", user)
+		x.Equal("sesame", pass)
+	})
+
+	// On a machine like this it is something else's job to renew it, and
+	// holding the first one means working until it expires and then failing
+	// until somebody restarts the daemon.
+	t.Run("a token is read again at every request", func(t *testing.T) {
+		x := require.New(t)
+
+		p := filepath.Join(t.TempDir(), "token")
+		x.NoError(os.WriteFile(p, []byte("first\n"), 0o600))
+
+		st := newStore()
+		s := newSink(t, wickhttp.Options{
+			Endpoint: serve(t, st),
+			Auth:     wickhttp.Auth{TokenFile: p},
+		})
+
+		x.NoError(s.Put(t.Context(), "a.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1}))
+		// Trimmed: a token in a file is a token with a newline after it, and a
+		// server sent one is a server that says no.
+		x.Equal("Bearer first", st.hdrs["a.rec"].Get("Authorization"))
+
+		x.NoError(os.WriteFile(p, []byte("second"), 0o600))
+
+		x.NoError(s.Put(t.Context(), "b.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1}))
+		x.Equal("Bearer second", st.hdrs["b.rec"].Get("Authorization"))
+	})
+
+	t.Run("a token that is not there is said so, on the request that needed it", func(t *testing.T) {
+		x := require.New(t)
+
+		p := filepath.Join(t.TempDir(), "gone")
+		st := newStore()
+		s := newSink(t, wickhttp.Options{
+			Endpoint: serve(t, st),
+			Auth:     wickhttp.Auth{TokenFile: p},
+		})
+
+		err := s.Put(t.Context(), "a.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1})
+		x.ErrorContains(err, "read the token")
+
+		_, err = s.Stat(t.Context(), "a.rec")
+		x.ErrorContains(err, "read the token")
+	})
+
+	t.Run("two answers to the same question is not an answer", func(t *testing.T) {
+		x := require.New(t)
+
+		_, err := wickhttp.New(wickhttp.Options{
+			Endpoint: "https://host",
+			Auth:     wickhttp.Auth{Username: "wick", TokenFile: "/tmp/token"},
+		})
+		x.ErrorContains(err, "two answers to the same question")
+
+		_, err = wickhttp.New(wickhttp.Options{
+			Endpoint: "https://host",
+			Auth:     wickhttp.Auth{Password: "sesame"},
+		})
+		x.ErrorContains(err, "without a username")
+	})
+}
+
+func basicOf(h http.Header) (string, string, bool) {
+	r := &http.Request{Header: h}
+
+	return r.BasicAuth()
 }
