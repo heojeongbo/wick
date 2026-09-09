@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/goccy/go-yaml v1.19.2
-	github.com/heojeongbo/wick/sink/s3 v0.0.0-20260909085302-1caffdab8391
+	github.com/heojeongbo/wick/sink/s3 v0.1.0
 	github.com/lesomnus/mkot v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/mkotx v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/pretty v0.0.0-20260907012347-f3fd02e2da01
