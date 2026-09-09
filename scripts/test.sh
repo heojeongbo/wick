@@ -35,6 +35,7 @@ cd "$__root"
 readonly MODULES=(
 	.
 	./sink/s3
+	./sink/sftp
 )
 
 # What is not counted, and why.

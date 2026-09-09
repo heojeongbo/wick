@@ -11,7 +11,10 @@ WORKDIR /app
 # need a third-party SDK are modules of their own; see scripts/test.sh.
 COPY go.work go.mod go.sum ./
 COPY sink/s3/go.mod sink/s3/go.sum ./sink/s3/
-RUN go mod download && (cd sink/s3 && go mod download)
+COPY sink/sftp/go.mod sink/sftp/go.sum ./sink/sftp/
+RUN go mod download \
+	&& (cd sink/s3 && go mod download) \
+	&& (cd sink/sftp && go mod download)
 
 COPY . .
 ENV CGO_ENABLED=0

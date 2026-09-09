@@ -6,9 +6,13 @@
 // as long as nothing has to resolve the recorded versions. This is what stops
 // anything having to. The CI job that builds each module with GOWORK=off is
 // what says when one of them has fallen behind.
+// A module added since the last release is behind a `replace` on both sides
+// until the release that names it. Cutting one is a tag per module and a commit
+// that drops the replaces; see the note in the module that has one.
 go 1.26.4
 
 use (
 	.
 	./sink/s3
+	./sink/sftp
 )

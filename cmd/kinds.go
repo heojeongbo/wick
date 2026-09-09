@@ -16,5 +16,6 @@ import (
 	_ "github.com/heojeongbo/wick/sink/dir"
 	_ "github.com/heojeongbo/wick/sink/http"
 	_ "github.com/heojeongbo/wick/sink/s3"
+	_ "github.com/heojeongbo/wick/sink/sftp"
 	_ "github.com/heojeongbo/wick/sink/webdav"
 )
