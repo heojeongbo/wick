@@ -40,6 +40,25 @@ type Spec struct {
 	SecretAccessKey string `yaml:"secret_access_key"`
 	SessionToken    string `yaml:"session_token"`
 
+	// Profile is the one to read out of the shared configuration, for a
+	// machine that has more than one.
+	Profile string `yaml:"profile"`
+
+	// AssumeRoleArn is a role to take on once the above has said who this is.
+	// It is how a machine reaches a bucket in an account it has no identity
+	// in. RoleSessionName is what the session is called in that account's
+	// logs, and is the only thing there that says which machine.
+	AssumeRoleArn   string `yaml:"assume_role_arn"`
+	RoleSessionName string `yaml:"role_session_name"`
+	// ExternalId is the secret the other account's role asks for, and is what
+	// stops one caller's role being used by another who knows its name.
+	ExternalId string `yaml:"external_id"`
+
+	// WebIdentityTokenFile holds a token from something that already knows who
+	// this is -- a Kubernetes service account, a CI runner -- and is exchanged
+	// for the role. It needs assume_role_arn and replaces the keys above.
+	WebIdentityTokenFile string `yaml:"web_identity_token_file"`
+
 	// PartSize and Concurrency are how a large object is broken up.
 	PartSize    size.Bytes `yaml:"part_size"`
 	Concurrency int        `yaml:"concurrency"`
@@ -55,17 +74,22 @@ type Spec struct {
 
 func (s *Spec) New(ctx context.Context) (sink.Sink, error) {
 	return New(ctx, Options{
-		Bucket:          s.Bucket,
-		Prefix:          s.Prefix,
-		Endpoint:        s.Endpoint,
-		Region:          s.Region,
-		PathStyle:       s.PathStyle,
-		AccessKeyID:     s.AccessKeyId,
-		SecretAccessKey: s.SecretAccessKey,
-		SessionToken:    s.SessionToken,
-		PartSize:        s.PartSize.Int64(),
-		Concurrency:     s.Concurrency,
-		RateLimit:       s.RateLimit.Int64(),
+		Bucket:               s.Bucket,
+		Prefix:               s.Prefix,
+		Endpoint:             s.Endpoint,
+		Region:               s.Region,
+		PathStyle:            s.PathStyle,
+		AccessKeyID:          s.AccessKeyId,
+		SecretAccessKey:      s.SecretAccessKey,
+		SessionToken:         s.SessionToken,
+		Profile:              s.Profile,
+		AssumeRoleARN:        s.AssumeRoleArn,
+		RoleSessionName:      s.RoleSessionName,
+		ExternalID:           s.ExternalId,
+		WebIdentityTokenFile: s.WebIdentityTokenFile,
+		PartSize:             s.PartSize.Int64(),
+		Concurrency:          s.Concurrency,
+		RateLimit:            s.RateLimit.Int64(),
 		TLS: wickhttp.TLS{
 			CAFile:   s.CaFile,
 			CertFile: s.CertFile,

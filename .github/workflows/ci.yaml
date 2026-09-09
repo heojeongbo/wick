@@ -47,12 +47,14 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             go.sum
+            sink/azure/go.sum
+            sink/gcs/go.sum
             sink/s3/go.sum
             sink/sftp/go.sum
       - name: every module says what it needs
         run: |
           set -eux
-          for m in . sink/s3 sink/sftp; do (cd "$m" && go mod tidy -diff); done
+          for m in . sink/azure sink/gcs sink/s3 sink/sftp; do (cd "$m" && go mod tidy -diff); done
 
   # Each module, built as somebody who imports it would build it: without the
   # workspace, against the versions its own go.mod records.
@@ -73,12 +75,14 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: |
             go.sum
+            sink/azure/go.sum
+            sink/gcs/go.sum
             sink/s3/go.sum
             sink/sftp/go.sum
       - name: each module on its own
         run: |
           set -eux
-          for m in . sink/s3 sink/sftp; do (cd "$m" && go build ./...); done
+          for m in . sink/azure sink/gcs sink/s3 sink/sftp; do (cd "$m" && go build ./...); done
 
   build:
     runs-on: ubuntu-latest

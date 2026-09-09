@@ -33,9 +33,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
 
 	"github.com/heojeongbo/wick/internal/throttle"
@@ -85,12 +87,37 @@ type Options struct {
 	// which is what a store reached by address rather than by name needs.
 	PathStyle bool
 
-	// AccessKeyID and SecretAccessKey are the credentials. Left unsaid, the
-	// machine's own are used -- an instance role, a profile, the environment --
-	// which is the better way round where it is available.
+	// AccessKeyID and SecretAccessKey are the credentials, written down.
+	//
+	// Left unsaid, the machine's own are used: an instance role, the
+	// environment, a profile. That is the better way round wherever it is
+	// available, because a long-lived key on a machine in a cupboard is a
+	// long-lived key on a machine somebody can walk up to.
 	AccessKeyID     string
 	SecretAccessKey string
 	SessionToken    string
+
+	// Profile is the one to read out of the shared configuration, for a
+	// machine that has more than one.
+	Profile string
+
+	// AssumeRoleARN is a role to take on once the credentials above have said
+	// who this is. It is how a machine reaches a bucket in an account it does
+	// not itself have an identity in.
+	AssumeRoleARN string
+	// RoleSessionName is what the session is called in the other account's
+	// logs. Worth setting: it is the only thing there that says which machine.
+	RoleSessionName string
+	// ExternalID is the secret the other account's role asks for, and is what
+	// stops one caller's role being used by another who happens to know its
+	// name.
+	ExternalID string
+
+	// WebIdentityTokenFile holds a token from something that already knows who
+	// this is -- a Kubernetes service account, a CI runner -- and is exchanged
+	// for the role. It replaces the credentials above rather than adding to
+	// them, so it needs AssumeRoleARN and nothing else.
+	WebIdentityTokenFile string
 
 	// PartSize and Concurrency are how the upload is broken up.
 	PartSize    int64
@@ -116,8 +143,8 @@ type Sink struct {
 }
 
 func New(ctx context.Context, o Options) (*Sink, error) {
-	if o.Bucket == "" {
-		return nil, fmt.Errorf("an s3 sink has to say which bucket")
+	if err := o.check(); err != nil {
+		return nil, err
 	}
 
 	part := o.PartSize
@@ -154,10 +181,43 @@ func New(ctx context.Context, o Options) (*Sink, error) {
 	}, nil
 }
 
+// check says whether the options can be meant.
+func (o Options) check() error {
+	switch {
+	case o.Bucket == "":
+		return fmt.Errorf("an s3 sink has to say which bucket")
+
+	case o.AccessKeyID != "" && o.Profile != "":
+		return fmt.Errorf("a key and a profile are two answers to the question of who this is; give one")
+
+	case o.AccessKeyID != "" && o.WebIdentityTokenFile != "":
+		return fmt.Errorf("a key and a web identity token are two answers to the question of who this is; give one")
+
+	case o.Profile != "" && o.WebIdentityTokenFile != "":
+		return fmt.Errorf("a profile and a web identity token are two answers to the question of who this is; give one")
+
+	case o.WebIdentityTokenFile != "" && o.AssumeRoleARN == "":
+		// The token is not a credential; it is something to exchange for one,
+		// and there is nothing to exchange it for.
+		return fmt.Errorf("a web identity token is exchanged for a role, and no role is named; say assume_role_arn")
+
+	case o.AssumeRoleARN == "" && o.ExternalID != "":
+		return fmt.Errorf("an external id is what a role asks for, and no role is named")
+
+	case o.AssumeRoleARN == "" && o.RoleSessionName != "":
+		return fmt.Errorf("a session name names a session with a role, and no role is named")
+	}
+
+	return nil
+}
+
 func newClient(ctx context.Context, o Options) (API, error) {
 	loads := []func(*awsconfig.LoadOptions) error{}
 	if o.Region != "" {
 		loads = append(loads, awsconfig.WithRegion(o.Region))
+	}
+	if o.Profile != "" {
+		loads = append(loads, awsconfig.WithSharedConfigProfile(o.Profile))
 	}
 	if o.AccessKeyID != "" {
 		loads = append(loads, awsconfig.WithCredentialsProvider(
@@ -176,12 +236,49 @@ func newClient(ctx context.Context, o Options) (API, error) {
 		return nil, z.Err(err, "work out how to reach the store")
 	}
 
+	if o.AssumeRoleARN != "" {
+		cfg.Credentials = assume(cfg, o)
+	}
+
 	return awss3.NewFromConfig(cfg, func(so *awss3.Options) {
 		if o.Endpoint != "" {
 			so.BaseEndpoint = aws.String(o.Endpoint)
 		}
 		so.UsePathStyle = o.PathStyle
 	}), nil
+}
+
+// assume is the credentials of the role, taken on with whatever the
+// configuration above worked out this machine is.
+//
+// Nothing is asked of STS here. The provider is built and wrapped in a cache;
+// the exchange happens at the first request that needs signing, which is also
+// where a role that cannot be taken on is found out about. That is the right
+// way round for a daemon: a role that is refused should fail a carry and be
+// retried, not stop the process from starting.
+func assume(cfg aws.Config, o Options) aws.CredentialsProvider {
+	api := sts.NewFromConfig(cfg)
+
+	if o.WebIdentityTokenFile != "" {
+		// The token replaces the credentials rather than adding to them: it is
+		// already a statement of who this is, from something that knows.
+		return aws.NewCredentialsCache(stscreds.NewWebIdentityRoleProvider(
+			api, o.AssumeRoleARN, stscreds.IdentityTokenFile(o.WebIdentityTokenFile),
+			func(p *stscreds.WebIdentityRoleOptions) {
+				p.RoleSessionName = o.RoleSessionName
+			},
+		))
+	}
+
+	return aws.NewCredentialsCache(stscreds.NewAssumeRoleProvider(
+		api, o.AssumeRoleARN,
+		func(p *stscreds.AssumeRoleOptions) {
+			p.RoleSessionName = o.RoleSessionName
+			if o.ExternalID != "" {
+				p.ExternalID = aws.String(o.ExternalID)
+			}
+		},
+	))
 }
 
 func (s *Sink) Put(ctx context.Context, name string, r io.Reader, want sink.Meta) error {

@@ -11,6 +11,8 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -492,4 +494,114 @@ func TestItRegistersItself(t *testing.T) {
 	spec, err := sink.NewSpec(s3.Kind)
 	x.NoError(err)
 	x.IsType(&s3.Spec{}, spec)
+}
+
+// Who this is, and who it then becomes.
+//
+// None of this dials: building a provider and wrapping it in a cache is
+// construction, and the exchange with STS happens at the first request that
+// needs signing. That is the right way round for a daemon -- a role that is
+// refused should fail a carry and be retried, not stop the process starting.
+func TestSayingWhoThisIs(t *testing.T) {
+	t.Run("a profile that no configuration holds is refused at startup", func(t *testing.T) {
+		x := require.New(t)
+
+		t.Setenv("AWS_CONFIG_FILE", filepath.Join(t.TempDir(), "config"))
+		t.Setenv("AWS_SHARED_CREDENTIALS_FILE", filepath.Join(t.TempDir(), "credentials"))
+
+		_, err := s3.New(t.Context(), s3.Options{Bucket: "b", Profile: "nobody"})
+		x.ErrorContains(err, "work out how to reach the store")
+	})
+
+	t.Run("one that is there is used", func(t *testing.T) {
+		x := require.New(t)
+
+		dir := t.TempDir()
+		p := filepath.Join(dir, "credentials")
+		x.NoError(os.WriteFile(p, []byte(
+			"[robot]\naws_access_key_id = AKIAEXAMPLE\naws_secret_access_key = secret\n"), 0o600))
+
+		t.Setenv("AWS_CONFIG_FILE", filepath.Join(dir, "config"))
+		t.Setenv("AWS_SHARED_CREDENTIALS_FILE", p)
+
+		s, err := s3.New(t.Context(), s3.Options{Bucket: "b", Region: "auto", Profile: "robot"})
+		x.NoError(err)
+		x.NotNil(s)
+	})
+
+	t.Run("a role is taken on, with an external id and a session name", func(t *testing.T) {
+		x := require.New(t)
+
+		s, err := s3.New(t.Context(), s3.Options{
+			Bucket: "b", Region: "auto",
+			AccessKeyID: "k", SecretAccessKey: "s",
+			AssumeRoleARN:   "arn:aws:iam::123456789012:role/recordings",
+			RoleSessionName: "thor-top",
+			ExternalID:      "sesame",
+		})
+		x.NoError(err)
+		x.NotNil(s)
+	})
+
+	t.Run("and a token is exchanged for one", func(t *testing.T) {
+		x := require.New(t)
+
+		p := filepath.Join(t.TempDir(), "token")
+		x.NoError(os.WriteFile(p, []byte("a.jwt.token"), 0o600))
+
+		s, err := s3.New(t.Context(), s3.Options{
+			Bucket: "b", Region: "auto",
+			AssumeRoleARN:        "arn:aws:iam::123456789012:role/recordings",
+			WebIdentityTokenFile: p,
+			RoleSessionName:      "thor-top",
+		})
+		x.NoError(err)
+		x.NotNil(s)
+	})
+
+	// Two answers to one question is not an answer, and which of them wins
+	// would otherwise depend on the order this happens to read them in.
+	for _, tc := range []struct {
+		name string
+		o    s3.Options
+		says string
+	}{
+		{
+			"a key and a profile",
+			s3.Options{Bucket: "b", AccessKeyID: "k", Profile: "p"},
+			"a key and a profile",
+		},
+		{
+			"a key and a token",
+			s3.Options{Bucket: "b", AccessKeyID: "k", WebIdentityTokenFile: "t", AssumeRoleARN: "r"},
+			"a key and a web identity token",
+		},
+		{
+			"a profile and a token",
+			s3.Options{Bucket: "b", Profile: "p", WebIdentityTokenFile: "t", AssumeRoleARN: "r"},
+			"a profile and a web identity token",
+		},
+		{
+			"a token with nothing to exchange it for",
+			s3.Options{Bucket: "b", WebIdentityTokenFile: "t"},
+			"no role is named",
+		},
+		{
+			"an external id with no role to ask for it",
+			s3.Options{Bucket: "b", ExternalID: "sesame"},
+			"an external id is what a role asks for",
+		},
+		{
+			"a session name with no role to have a session with",
+			s3.Options{Bucket: "b", RoleSessionName: "thor-top"},
+			"a session name names a session with a role",
+		},
+	} {
+		t.Run(tc.name+" is refused", func(t *testing.T) {
+			x := require.New(t)
+
+			_, err := s3.New(t.Context(), tc.o)
+			x.ErrorContains(err, tc.says)
+		})
+	}
 }

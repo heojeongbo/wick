@@ -34,6 +34,8 @@ cd "$__root"
 # accident.
 readonly MODULES=(
 	.
+	./sink/azure
+	./sink/gcs
 	./sink/s3
 	./sink/sftp
 )

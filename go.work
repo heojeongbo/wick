@@ -15,4 +15,6 @@ use (
 	.
 	./sink/s3
 	./sink/sftp
+	./sink/gcs
+	./sink/azure
 )

@@ -13,7 +13,9 @@ package cmd
 import (
 	_ "github.com/heojeongbo/wick/source/dir"
 
+	_ "github.com/heojeongbo/wick/sink/azure"
 	_ "github.com/heojeongbo/wick/sink/dir"
+	_ "github.com/heojeongbo/wick/sink/gcs"
 	_ "github.com/heojeongbo/wick/sink/http"
 	_ "github.com/heojeongbo/wick/sink/s3"
 	_ "github.com/heojeongbo/wick/sink/sftp"

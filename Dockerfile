@@ -10,9 +10,13 @@ WORKDIR /app
 # does not send the whole dependency graph down the wire again. The sinks that
 # need a third-party SDK are modules of their own; see scripts/test.sh.
 COPY go.work go.mod go.sum ./
+COPY sink/azure/go.mod sink/azure/go.sum ./sink/azure/
+COPY sink/gcs/go.mod sink/gcs/go.sum ./sink/gcs/
 COPY sink/s3/go.mod sink/s3/go.sum ./sink/s3/
 COPY sink/sftp/go.mod sink/sftp/go.sum ./sink/sftp/
 RUN go mod download \
+	&& (cd sink/azure && go mod download) \
+	&& (cd sink/gcs && go mod download) \
 	&& (cd sink/s3 && go mod download) \
 	&& (cd sink/sftp && go mod download)
 
