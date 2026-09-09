@@ -127,8 +127,14 @@ github.com/googleapis/enterprise-certificate-proxy v0.3.17 h1:73NfMHdiqo9JFU9+7a
 github.com/googleapis/enterprise-certificate-proxy v0.3.17/go.mod h1:rSEsBUemEBZEexP2y6jPp16LUmUbjmSbcPMQizR0o4k=
 github.com/googleapis/gax-go/v2 v2.23.0 h1:Tchl7qkvE7Ip3y+ztvNufYFvkfqTe7NfLTYGIdJRLuE=
 github.com/googleapis/gax-go/v2 v2.23.0/go.mod h1:rBQKOVJCdb8IFEzg+FCwlt1LP/xMDGuqUXhUG+XMXEg=
-github.com/heojeongbo/wick/sink/s3 v0.1.0 h1:dn5X1OQcerSWUo77LiI4FTinqgqwM1XW72xnr1oq0LQ=
-github.com/heojeongbo/wick/sink/s3 v0.1.0/go.mod h1:0h7RS8Q/VC7AbZWyvpRYck/myThtWwz0TK7PdzPu7uY=
+github.com/heojeongbo/wick/sink/azure v0.2.0 h1:8aEaTA/QqvePCxumsVDRjbWhiZOjNTXdNBIh4dDOgpw=
+github.com/heojeongbo/wick/sink/azure v0.2.0/go.mod h1:utk3FmKrw+a0j1xKOgj7vJysQKalI822W5CEM7eNkLo=
+github.com/heojeongbo/wick/sink/gcs v0.2.0 h1:l5SoQ+NpNXi3luVnJEl6Xuc72ojkG8i5Fq7cAasy8Aw=
+github.com/heojeongbo/wick/sink/gcs v0.2.0/go.mod h1:SSPP5a9gznYakMCv+xfIVdAIHcKpprf/xTd4Vfa5VCU=
+github.com/heojeongbo/wick/sink/s3 v0.2.0 h1:YKcuj3/882pgxyosJNsAladQhySG/yvHKhrhLk2EkIE=
+github.com/heojeongbo/wick/sink/s3 v0.2.0/go.mod h1:7ZQ5rzbGJ6nkWqRTTfibSRd4ORQPak62bZqlePZxFss=
+github.com/heojeongbo/wick/sink/sftp v0.2.0 h1:rOXl7soUb9iEV5CRmnnqcffi+8QK0N+2LDJU7NYbJqQ=
+github.com/heojeongbo/wick/sink/sftp v0.2.0/go.mod h1:mJVKeNyBfeHbFg3TUDahoZ6WWIzLrmfH57gUqccTRbY=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=

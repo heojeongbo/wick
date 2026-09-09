@@ -9,11 +9,13 @@ require (
 	github.com/heojeongbo/wick v0.2.0
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/pkg/sftp v1.13.11
+	github.com/stretchr/testify v1.12.1
 	golang.org/x/crypto v0.57.0
 )
 
 require (
 	github.com/kr/fs v0.1.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 )

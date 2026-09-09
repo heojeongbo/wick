@@ -149,14 +149,23 @@ Tags resolve it, because every module can name the same one.
 # version about to be tagged.
 git commit && git push
 
-git tag v0.2.0 sink/s3/v0.2.0 sink/sftp/v0.2.0 sink/gcs/v0.2.0 sink/azure/v0.2.0
+# One at a time -- `git tag` names one tag and takes the rest as a commit.
+for t in v0.2.0 sink/s3/v0.2.0 sink/sftp/v0.2.0 sink/gcs/v0.2.0 sink/azure/v0.2.0
+do git tag "$t"; done
 git push origin --tags
 
-# The public proxy lags the tags by minutes. This writes the go.sum entries in
-# the meantime, and the hashes are the ones it will serve.
-GOPRIVATE='github.com/heojeongbo/*' GOWORK=off go mod download
+# Then, in every module: the sums. The public proxy lags the tags by minutes,
+# and GOPRIVATE is what fetches from the tag in the meantime -- the hashes are
+# the ones the proxy will go on to serve.
+export GOPRIVATE='github.com/heojeongbo/*' GOWORK=off
+for m in . sink/*; do (cd "$m" && go mod tidy && go build ./...); done
 git commit -am 'Record the tagged versions' && git push
 ```
+
+`tidy` and not `download`: the workspace lets a module compile against a
+requirement it never wrote down, because a sibling had it. Outside the
+workspace that is a missing `go.sum` entry, and this is the step that finds it —
+which is what the `modules` job in CI is checking on every push.
 
 The committed `go.work` is what keeps a checkout from ever caring about any of
 this. The `modules` job in CI builds every module with `GOWORK=off`, which is
