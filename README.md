@@ -92,6 +92,7 @@ spools:
       type: dir
       path: /var/log/app/rec
       include: ["*.rec"]
+    carry:
       settle_for: 10s
     to:
       - sink: cloud

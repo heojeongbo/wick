@@ -13,10 +13,15 @@
 # `path` of `journal` is WICK_JOURNAL_PATH. A value in this file can also name
 # one instead of holding it, which is what a password is for:
 #
-#     access_key_id: "${env:S3_KEY_ID}"
+#     access_key_id: "$${env:S3_KEY_ID}"
 #
 # Without ":-default" the variable is required, so a missing secret is noticed
 # at startup rather than at the first carry.
+#
+# The examples below are written with two dollars where yours has one. Naming a
+# variable is done to the whole file before any of it is read as YAML, so a name
+# written in a comment is a name that has to be set -- and "$$" is how this file
+# says a dollar it does not mean as a name. In yours, write one.
 
 # What this machine is called in the name an object is given.
 #
@@ -60,8 +65,8 @@ sinks: {}
   #   # Left unsaid, the machine's own credentials are used -- an instance
   #   # role, a profile, the environment -- which is the better way round
   #   # wherever it is available.
-  #   access_key_id: "${env:S3_KEY_ID}"
-  #   secret_access_key: "${env:S3_KEY_SECRET}"
+  #   access_key_id: "$${env:S3_KEY_ID}"
+  #   secret_access_key: "$${env:S3_KEY_SECRET}"
   #   part_size: 16MiB     # how a large object is broken up
   #   concurrency: 4       # how many parts are in the air at once
   #   rate_limit: 20MiB    # bytes a second; no limit when unset
@@ -73,7 +78,7 @@ sinks: {}
   #   endpoint: https://collector.example.com/drop
   #   method: PUT                        # or POST
   #   headers:
-  #     Authorization: "Bearer ${env:COLLECTOR_TOKEN}"
+  #     Authorization: "Bearer $${env:COLLECTOR_TOKEN}"
   #   digest_header: X-Content-Sha256    # unset checks the length alone
   #   rate_limit: 20MiB
   #   ca_file: /etc/ssl/certs/internal.pem

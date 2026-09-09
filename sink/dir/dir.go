@@ -10,8 +10,10 @@
 //
 // A hash. Reading a file back to compute one costs as much as writing it did,
 // and this sink is often the one on the slow disk. So [Sink.Stat] answers with
-// the size and nothing else, and the engine verifies against the size -- which
-// it says at startup, so that nobody is left thinking a hash was checked.
+// the size and nothing else, and a read-back against this sink is a read-back
+// of the length: a stream that ended early is caught, and a file that arrived
+// whole and wrong is not. That is the trade, and it is why the length is also
+// checked before the rename rather than only after it.
 package dir
 
 import (

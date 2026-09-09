@@ -30,9 +30,12 @@ cd "$__root"
 #				binary it has just made.
 #	*.g.go			Generated.
 #
-# Matched against the path as it appears in the profile, which is the import
-# path and then the file.
-readonly EXCLUDE='(/wick/main\.go|\.g\.go)'
+# Matched against the file's path alone, which is why every reader below cuts
+# the line and column off first. It is exported rather than passed with `-v`
+# because awk reads escapes out of a `-v` value: `\.g\.go` arrives as `.g.go`,
+# which matches "config.go" -- and a gate that quietly stops counting two files
+# is exactly the thing this gate is for.
+export EXCLUDE='(/wick/main\.go$|\.g\.go$)'
 
 echo "==> gofmt"
 fmt="$(gofmt -l .)"
@@ -57,18 +60,21 @@ echo "==> coverage"
 # `go tool cover -func` is what decides, because it folds the several test
 # binaries that may each have reported the same block. A function that is not
 # at 100% is named with the file and line it starts on.
-short="$(go tool cover -func=cover.out | awk -v ex="$EXCLUDE" '
+short="$(go tool cover -func=cover.out | awk '
+	BEGIN { ex = ENVIRON["EXCLUDE"] }
 	$1 == "total:" { next }
-	$1 ~ ex        { next }
+	{ split($1, p, ":"); if (p[1] ~ ex) next }
 	$NF != "100.0%" { print }
 ')"
 
 # The summary, over the same set of files the gate is about.
-awk -v ex="$EXCLUDE" '
+awk '
+	BEGIN { ex = ENVIRON["EXCLUDE"] }
 	NR == 1 { next }                                  # "mode: atomic"
 	{
 		# <path>:<line>.<col>,<line>.<col> <numstmts> <count>
-		if ($1 ~ ex) next
+		split($1, p, ":")
+		if (p[1] ~ ex) next
 		stmts[$1] = $2 + 0
 		if ($3 + 0 > 0) hit[$1] = 1
 	}
@@ -95,10 +101,12 @@ echo "$short" | sed 's/^/    /'
 # can be covered, and neither is what `-func` is complaining about.
 echo ""
 echo "the statements nothing ran:"
-awk -v ex="$EXCLUDE" '
+awk '
+	BEGIN { ex = ENVIRON["EXCLUDE"] }
 	NR == 1 { next }
 	{
-		if ($1 ~ ex) next
+		split($1, p, ":")
+		if (p[1] ~ ex) next
 		if ($2 + 0 == 0) next
 		stmts[$1] = $2 + 0
 		if ($3 + 0 > 0) hit[$1] = 1

@@ -7,4 +7,8 @@
 /.gitignore
 /docker-bake.hcl
 /docker-compose.yaml
-/wick.yaml
+
+# wick.yaml is not excluded, though it is mounted at runtime rather than baked
+# into the image. It is the documentation, and the tests read it: a file that
+# says what may be written and does not itself load is worse than none, and it
+# has caught itself out once already.

@@ -9,10 +9,12 @@ on:
       - .github/workflows/ci.yaml
       - cmd/**
       - disk/**
+      - internal/**
       - journal/**
       - naming/**
       - retain/**
       - sink/**
+      - size/**
       - source/**
       - spool/**
       - trigger/**

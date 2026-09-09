@@ -388,3 +388,15 @@ func mustRead(t *testing.T, p string) string {
 
 	return string(b)
 }
+
+// The file this ships with is the documentation, and a documentation file that
+// does not load is worse than none. It has caught itself out once already:
+// naming a variable is done to the whole file before any of it is read as
+// YAML, so a "${env:...}" written in a *comment* is a name that has to be set.
+func TestTheFileThisShipsWith(t *testing.T) {
+	x := require.New(t)
+
+	r := xlitest.Run(t, cmd.NewCmdRoot(), "--config", "../wick.yaml", "config")
+	x.NoError(r.Err)
+	x.Contains(r.Stdout, "identity:")
+}
