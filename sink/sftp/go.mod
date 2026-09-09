@@ -6,7 +6,7 @@ module github.com/heojeongbo/wick/sink/sftp
 go 1.26.4
 
 require (
-	github.com/heojeongbo/wick v0.1.0
+	github.com/heojeongbo/wick v0.2.0
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/pkg/sftp v1.13.11
 	golang.org/x/crypto v0.57.0
@@ -17,5 +17,3 @@ require (
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 )
-
-replace github.com/heojeongbo/wick => ../..

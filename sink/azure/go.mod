@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0
-	github.com/heojeongbo/wick v0.0.0-00010101000000-000000000000
+	github.com/heojeongbo/wick v0.2.0
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 )
 
@@ -24,5 +24,3 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 )
-
-replace github.com/heojeongbo/wick => ../..

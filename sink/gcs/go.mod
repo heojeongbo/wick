@@ -7,7 +7,7 @@ go 1.26.4
 
 require (
 	cloud.google.com/go/storage v1.67.1
-	github.com/heojeongbo/wick v0.1.0
+	github.com/heojeongbo/wick v0.2.0
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	google.golang.org/api v0.287.1
 )
@@ -59,6 +59,3 @@ require (
 	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-// Until the release that names it; see docs/EXTENDING.md.
-replace github.com/heojeongbo/wick => ../..
