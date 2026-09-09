@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/goccy/go-yaml v1.19.2
-	github.com/heojeongbo/wick/sink/s3 v0.2.0
+	github.com/heojeongbo/wick/sink/s3 v0.2.1
 	github.com/lesomnus/mkot v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/mkotx v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/pretty v0.0.0-20260907012347-f3fd02e2da01
@@ -94,9 +94,9 @@ require (
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/heojeongbo/wick/sink/azure v0.2.0
-	github.com/heojeongbo/wick/sink/gcs v0.2.0
-	github.com/heojeongbo/wick/sink/sftp v0.2.0
+	github.com/heojeongbo/wick/sink/azure v0.2.1
+	github.com/heojeongbo/wick/sink/gcs v0.2.1
+	github.com/heojeongbo/wick/sink/sftp v0.2.1
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

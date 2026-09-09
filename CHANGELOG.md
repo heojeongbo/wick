@@ -6,6 +6,17 @@ which is the build and not the release.
 
 ## Unreleased
 
+## v0.2.1
+
+**Fixed**
+
+- `sink/gcs`, `sink/azure` and `sink/sftp` at v0.2.0 cannot be built on their
+  own. Each compiled against requirements it had never written down, because a
+  sibling module in the workspace happened to have them; outside the workspace
+  that is a missing `go.sum` entry. **Use v0.2.1.** The v0.2.0 tags stay where
+  they are — the checksum database has recorded them, and a moved tag is a
+  mismatch that cannot be undone.
+
 ## v0.2.0
 
 Seven places to carry to, and the SDK-bearing ones in modules of their own.

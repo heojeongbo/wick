@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.112.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0
 	github.com/aws/smithy-go v1.28.1
-	github.com/heojeongbo/wick v0.2.0
+	github.com/heojeongbo/wick v0.2.1
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/stretchr/testify v1.12.1
 )

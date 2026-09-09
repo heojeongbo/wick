@@ -7,7 +7,7 @@ go 1.26.4
 
 require (
 	cloud.google.com/go/storage v1.67.1
-	github.com/heojeongbo/wick v0.2.0
+	github.com/heojeongbo/wick v0.2.1
 	github.com/lesomnus/z v0.0.0-20260907061127-c3858eb05878
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/api v0.287.1
