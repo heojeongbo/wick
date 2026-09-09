@@ -1,0 +1,5 @@
+# What this machine is called in the name an object is given. Left unsaid it is
+# the hostname, which is what keeps several machines carrying the same kind of
+# file into the same bucket from writing over each other.
+identity:
+  name: ""
