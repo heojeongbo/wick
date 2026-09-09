@@ -3,6 +3,7 @@ package dir
 import (
 	"context"
 
+	"github.com/heojeongbo/wick/size"
 	"github.com/heojeongbo/wick/source"
 )
 
@@ -17,6 +18,8 @@ func init() { source.Register(Kind, func() source.Spec { return &Spec{} }) }
 // variables are made from, so a field added here answers to one without
 // anything being written anywhere else.
 type Spec struct {
+	source.Typed `yaml:",inline"`
+
 	// Path is the directory to look in.
 	Path string `yaml:"path"`
 
@@ -32,7 +35,7 @@ type Spec struct {
 
 	// MinSize leaves anything smaller, in bytes. A file of no length is
 	// usually one that has been created and not written yet.
-	MinSize int64 `yaml:"min_size"`
+	MinSize size.Bytes `yaml:"min_size"`
 }
 
 func (s *Spec) New(ctx context.Context) (source.Source, error) {
@@ -41,7 +44,7 @@ func (s *Spec) New(ctx context.Context) (source.Source, error) {
 		Include:   s.Include,
 		Exclude:   s.Exclude,
 		Recursive: s.Recursive,
-		MinSize:   s.MinSize,
+		MinSize:   s.MinSize.Int64(),
 	})
 }
 

@@ -13,7 +13,11 @@ import (
 	_ "github.com/heojeongbo/wick/sink/s3"
 )
 
-type spec struct{ kind string }
+type spec struct {
+	sink.Typed `yaml:",inline"`
+
+	kind string
+}
 
 func (s *spec) New(ctx context.Context) (sink.Sink, error) { return nil, nil } //nolint:nilnil // nothing to make
 

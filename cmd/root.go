@@ -11,7 +11,8 @@ import (
 
 func NewCmdRoot() *xli.Command {
 	return &xli.Command{
-		Name: "wick",
+		Name:  "wick",
+		Brief: "draw what accumulates, and carry it away",
 
 		Flags: flg.Flags{
 			&flg.String{Name: "config", Brief: "path to config file"},
@@ -20,6 +21,10 @@ func NewCmdRoot() *xli.Command {
 		Commands: []*xli.Command{
 			NewCmdVersion(),
 			NewCmdConfig(),
+			NewCmdRun(),
+			NewCmdOnce(),
+			NewCmdStatus(),
+			NewCmdForget(),
 		},
 
 		Handler: xli.Chain(

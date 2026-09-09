@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/heojeongbo/wick/sink"
+	"github.com/heojeongbo/wick/size"
 )
 
 // Kind is what a configuration calls this one.
@@ -16,6 +17,8 @@ func init() { sink.Register(Kind, func() sink.Spec { return &Spec{} }) }
 // This is the one for a server the fleet already runs. Nothing here names a
 // cloud.
 type Spec struct {
+	sink.Typed `yaml:",inline"`
+
 	// Endpoint is the address things are put under.
 	Endpoint string `yaml:"endpoint"`
 	// Method is PUT when it is not said; POST is the other one servers ask for.
@@ -27,7 +30,7 @@ type Spec struct {
 	// out of. Unset means the read-back checks the length alone.
 	DigestHeader string `yaml:"digest_header"`
 	// RateLimit is bytes per second; no limit when it is not said.
-	RateLimit int64 `yaml:"rate_limit"`
+	RateLimit size.Bytes `yaml:"rate_limit"`
 
 	// CaFile is who to believe about the server.
 	CaFile string `yaml:"ca_file"`
@@ -47,7 +50,7 @@ func (s *Spec) New(ctx context.Context) (sink.Sink, error) {
 		Method:       s.Method,
 		Headers:      s.Headers,
 		DigestHeader: s.DigestHeader,
-		RateLimit:    s.RateLimit,
+		RateLimit:    s.RateLimit.Int64(),
 		TLS: TLS{
 			CAFile:   s.CaFile,
 			CertFile: s.CertFile,

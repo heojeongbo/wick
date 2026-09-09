@@ -64,6 +64,22 @@ type Spec interface {
 	New(ctx context.Context) (Sink, error)
 }
 
+// Typed is embedded, inline, by every spec:
+//
+//	type Spec struct {
+//		sink.Typed `yaml:",inline"`
+//		Bucket string `yaml:"bucket"`
+//	}
+//
+// It is there so that the `type:` which chose the spec is a field the spec
+// knows about. A configuration is read strictly -- a key nothing answers to is
+// refused rather than ignored, since that is what a typo looks like -- and
+// without this the one key every spec is guaranteed to be given would be the
+// first thing refused.
+type Typed struct {
+	Type string `yaml:"type"`
+}
+
 var kinds = registry.New[Spec]("sink")
 
 // Register makes a kind of sink available under a name, and is called from the

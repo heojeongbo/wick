@@ -4,16 +4,29 @@ services:
     command: [run]
 
     network_mode: host
-    privileged: true
 
     volumes:
       - ./wick.yaml:/wick.yaml:ro
+      # Where the records are kept. It has to survive a restart, or everything
+      # is carried again every time this starts.
+      - wick.journal:/var/lib/wick
+      # What is being watched. Read-write, because a retention that deletes or
+      # moves has to be able to.
+      - ${WATCH:-./dist}:${WATCH:-./dist}
+
+    # uid and gid, not just uid. A scratch image has no /etc/passwd, so a
+    # supplementary group never resolves, and every group-bit permission the
+    # host grants becomes invisible.
+    user: "65532:65532"
 
     deploy:
       resources:
         limits:
-          cpus: "4"
-          memory: 64M
-        reservations:
           cpus: "2"
-          memory: 32M
+          memory: 256M
+        reservations:
+          cpus: "1"
+          memory: 64M
+
+volumes:
+  wick.journal:

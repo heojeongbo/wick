@@ -10,7 +10,11 @@ import (
 	_ "github.com/heojeongbo/wick/source/dir"
 )
 
-type spec struct{ kind string }
+type spec struct {
+	source.Typed `yaml:",inline"`
+
+	kind string
+}
 
 func (s *spec) New(ctx context.Context) (source.Source, error) { return nil, nil } //nolint:nilnil // nothing to make
 

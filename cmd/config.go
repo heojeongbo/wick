@@ -9,6 +9,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/heojeongbo/wick/cmd/config"
+	"github.com/lesomnus/otx"
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/xli"
 	"github.com/lesomnus/xli/flg"
@@ -16,6 +17,13 @@ import (
 )
 
 var use_config = z.NewUse[*config.Config]()
+
+// startOtel is a variable rather than a call, for the same reason the journal
+// and the listener are handed over where they are used: the failure is real on
+// a machine -- a collector that cannot be reached, a port already taken -- and
+// there is no configuration this build can express that produces it here, so
+// there is no other way to have the branch run before a machine runs it.
+var startOtel = func(ctx context.Context, o *otx.Otx) error { return o.Start(ctx) }
 
 func NewCmdConfig() *xli.Command {
 	return &xli.Command{
@@ -69,7 +77,7 @@ func UseConfigInit(ctx context.Context, cmd *xli.Command) (context.Context, *con
 	if err != nil {
 		return nil, nil, z.Err(err, "build otel")
 	}
-	if err := o.Start(ctx); err != nil {
+	if err := startOtel(ctx, o); err != nil {
 		return nil, nil, z.Err(err, "start otel")
 	}
 

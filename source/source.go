@@ -94,6 +94,13 @@ type Spec interface {
 	New(ctx context.Context) (Source, error)
 }
 
+// Typed is embedded, inline, by every spec, so that the `type:` which chose it
+// is a field the spec knows about. See [github.com/heojeongbo/wick/sink.Typed]
+// for why that matters.
+type Typed struct {
+	Type string `yaml:"type"`
+}
+
 var kinds = registry.New[Spec]("source")
 
 // Register makes a kind of source available under a name, and is called from

@@ -62,7 +62,9 @@ func (s *Spool) Run(ctx context.Context) error {
 		case <-timer.C:
 		}
 
+		began := s.now()
 		r, err := s.Once(ctx)
+		s.record(ctx, r, s.now().Sub(began))
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil

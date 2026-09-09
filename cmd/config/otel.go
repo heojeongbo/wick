@@ -7,6 +7,11 @@ import (
 	"github.com/lesomnus/mkot"
 	"github.com/lesomnus/mkot/mkotx"
 	"github.com/lesomnus/mkot/pretty"
+	// Imported for the kind it registers, not for anything named here. A
+	// deployment that writes `prometheus/local` under `exporters` gets a
+	// metrics endpoint on the machine; one that says nothing gets no port
+	// opened, which is the way round that leaves the decision written down.
+	_ "github.com/lesomnus/mkot/prometheus"
 	"github.com/lesomnus/otx"
 	"github.com/lesomnus/z"
 	"go.opentelemetry.io/otel/attribute"

@@ -1,5 +1,160 @@
-# What this machine is called in the name an object is given. Left unsaid it is
-# the hostname, which is what keeps several machines carrying the same kind of
-# file into the same bucket from writing over each other.
+# wick, as it comes.
+#
+# Nothing here is on that was not written down. There are no spools, so this
+# configuration carries nothing; it is here to say what may be written and what
+# each thing means. `wick config` prints what the app ended up with, which is
+# how to check.
+#
+# What is said here can be overruled, and the last word wins:
+#
+#     built-in defaults  <  this file  <  the environment  <  the flags
+#
+# Every field answers to an environment variable named after the path to it:
+# `path` of `journal` is WICK_JOURNAL_PATH. A value in this file can also name
+# one instead of holding it, which is what a password is for:
+#
+#     access_key_id: "${env:S3_KEY_ID}"
+#
+# Without ":-default" the variable is required, so a missing secret is noticed
+# at startup rather than at the first carry.
+
+# What this machine is called in the name an object is given.
+#
+# Left unsaid it is the hostname. That is what keeps three machines in one
+# robot, all carrying the same kind of file into the same bucket, from writing
+# over each other.
 identity:
   name: ""
+
+# Where what has already been carried is remembered.
+#
+# It has to survive a restart. Without that the daemon carries everything again
+# every time it starts, which costs the link -- and, with a retention that
+# deletes, is the difference between tidying up and nothing ever being tidied.
+journal:
+  path: wick.db
+
+# Where the liveness and readiness probes are answered. Unset is not answered,
+# which is right on a machine that is not running this under anything that
+# probes.
+#
+# The two are not the same question. Liveness says yes while the link is down,
+# because the link being down is the case this exists for; readiness fails when
+# the journal cannot be read, because carrying without knowing what has already
+# been carried is how a file gets deleted twice.
+health:
+  endpoint: ""
+
+# The places things go, by name, so that a spool can point at one and two spools
+# can share it. Sharing is worth doing: the connections are shared with it.
+sinks: {}
+  # An S3-compatible store: AWS, MinIO, Ceph, R2, whatever the building runs.
+  #
+  # cloud:
+  #   type: s3
+  #   bucket: recordings
+  #   prefix: robots
+  #   endpoint: https://s3.example.com   # AWS itself when unset
+  #   region: auto
+  #   path_style: false                  # true for a store reached by address
+  #   # Left unsaid, the machine's own credentials are used -- an instance
+  #   # role, a profile, the environment -- which is the better way round
+  #   # wherever it is available.
+  #   access_key_id: "${env:S3_KEY_ID}"
+  #   secret_access_key: "${env:S3_KEY_SECRET}"
+  #   part_size: 16MiB     # how a large object is broken up
+  #   concurrency: 4       # how many parts are in the air at once
+  #   rate_limit: 20MiB    # bytes a second; no limit when unset
+
+  # A server the fleet already runs. No cloud SDK, no notion of a region.
+  #
+  # onsite:
+  #   type: http
+  #   endpoint: https://collector.example.com/drop
+  #   method: PUT                        # or POST
+  #   headers:
+  #     Authorization: "Bearer ${env:COLLECTOR_TOKEN}"
+  #   digest_header: X-Content-Sha256    # unset checks the length alone
+  #   rate_limit: 20MiB
+  #   ca_file: /etc/ssl/certs/internal.pem
+  #   # Read again at every handshake, so a certificate something else renews
+  #   # is picked up without a restart.
+  #   cert_file: /var/lib/wick/client.crt
+  #   key_file: /var/lib/wick/client.key
+
+  # A directory. A mounted NAS, a second disk, or a drive somebody walks out to
+  # the machine with -- which on a robot with no uplink worth the name is still
+  # the fastest way to move half a gigabyte.
+  #
+  # nearby:
+  #   type: dir
+  #   path: /mnt/collect
+
+# The places watched, and where what is found in them goes.
+#
+# Something is carried only when *every* destination has confirmed it, which is
+# what makes "the cloud and the server in the building" one arrangement rather
+# than two half-arrangements. A restart in the middle does not send again to the
+# one that already answered.
+spools: []
+  # - name: recordings          # what its records are kept under; changing it
+  #                             # is telling the daemon it has carried nothing
+  #   source:
+  #     type: dir
+  #     path: /var/log/app/rec
+  #     include: ["*.rec"]      # a pattern with a "/" is about the whole key
+  #     exclude: ["*.partial"]  # and wins over include
+  #     recursive: false
+  #     min_size: 1KiB          # a file of no length is one nothing wrote yet
+  #
+  #   to:
+  #     - sink: cloud
+  #       name_as: "{host}/{yyyy}/{mm}/{dd}/{name}"
+  #       verify: true          # on unless turned off; see below
+  #     - sink: onsite
+  #       name_as: "{name}"
+  #
+  #   # Any of these is enough, and whichever comes first is the one that fires.
+  #   # With nothing said, this spool carries only when something asks it to.
+  #   trigger:
+  #     every: 15m              # the one that makes a quiet machine hand its
+  #                             # files over eventually
+  #     count: 10               # the one that stops a busy one accumulating
+  #     bytes: 2GiB             # the one for a few very large things
+  #     free_below: 20GiB       # not about carrying: about the disk filling
+  #
+  #   carry:
+  #     # How long something has to have been unchanged before it is carried. A
+  #     # file that is still being written looks exactly like a file that has
+  #     # been written, and this is the only thing that tells them apart.
+  #     settle_for: 10s
+  #     workers: 2              # one, unless said: the link is usually shared
+  #     attempts: 5             # then it is set aside, so that one thing that
+  #                             # cannot be carried does not hold up the rest
+  #
+  #   # What becomes of the local copy once every destination has confirmed it.
+  #   # Unsaid is `keep`, and that is deliberate: there is no sensible default
+  #   # for deleting a file.
+  #   retain:
+  #     after: delete           # keep | delete | move
+  #     grace: 24h              # long enough that somebody who notices the
+  #                             # wrong thing was carried can still reach it
+  #     move_to: /var/log/app/rec.done
+  #     free_below: 20GiB       # act at once when the disk is tight; the window
+  #                             # is a kindness and this is not the time for one
+
+# Telemetry, spelled the way the OpenTelemetry Collector spells it.
+#
+# A signal this says nothing about is off rather than an error. `pretty` writes
+# the human-readable log this prints by default; add `prometheus/local` for a
+# metrics endpoint on the machine, or `otlp/...` to send it somewhere.
+#
+# otel:
+#   exporters:
+#     prometheus/local:
+#       endpoint: ":8888"
+#       namespace: wick
+#   providers:
+#     meter:
+#       processors: [resource/wick]
+#       exporters: [prometheus/local]

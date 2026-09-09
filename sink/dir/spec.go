@@ -13,6 +13,8 @@ func init() { sink.Register(Kind, func() sink.Spec { return &Spec{} }) }
 
 // A Spec is what a configuration says about a directory sink.
 type Spec struct {
+	sink.Typed `yaml:",inline"`
+
 	// Path is the directory to write into.
 	Path string `yaml:"path"`
 }

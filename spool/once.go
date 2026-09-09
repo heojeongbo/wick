@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/z"
@@ -107,13 +108,14 @@ func (s *Spool) due(ctx context.Context, items []source.Item, r *Report) []sourc
 	for _, it := range items {
 		was, known := s.seen[it.Key]
 		if !known || was.size != it.Size || !was.modAt.Equal(it.ModAt) {
-			// It is new, or it has changed since the last look. Either way the
-			// clock starts now.
-			s.seen[it.Key] = sighting{size: it.Size, modAt: it.ModAt, at: now}
-			if s.settle > 0 {
-				continue
-			}
-		} else if now.Sub(was.at) < s.settle {
+			// It is new, or it has changed since the last look. Either way
+			// what was watched about it starts again from now.
+			was = sighting{size: it.Size, modAt: it.ModAt, at: now}
+			known = false
+			s.seen[it.Key] = was
+		}
+
+		if !s.settled(it, was, known, now) {
 			continue
 		}
 
@@ -143,6 +145,40 @@ func (s *Spool) due(ctx context.Context, items []source.Item, r *Report) []sourc
 	}
 
 	return due
+}
+
+// settled says whether something has stopped changing.
+//
+// # Why the file's own time comes first
+//
+// Because it is the only one that survives a restart. `wick once` is a fresh
+// process every time something runs it, and a gate that only knew what this
+// process had watched would say "not yet" on every single run -- a one-shot
+// that can never carry anything, which is the shape most schedulers use.
+//
+// # Why what was watched is still kept
+//
+// For the machine that boots without a network and has its clock put right
+// hours later. Until that happens its idea of now is behind every file it
+// holds, and the file's own time would say "written in the future" forever.
+// What this process has watched happen is still true then, so that is what is
+// used -- and it is only reachable in that case, so a clock that is right
+// costs nothing for it.
+func (s *Spool) settled(it source.Item, was sighting, known bool, now time.Time) bool {
+	if s.settle <= 0 {
+		return true
+	}
+
+	age := now.Sub(it.ModAt)
+	switch {
+	case age >= s.settle:
+		return true
+
+	case age >= 0:
+		return false
+	}
+
+	return known && now.Sub(was.at) >= s.settle
 }
 
 // carryAll runs the carries, at most [Config.Workers] at a time.

@@ -280,14 +280,9 @@ func TestSettle(t *testing.T) {
 		g.clock.tick(9 * time.Second)
 		g.src.Add("a.rec", []byte("half and more"), start.Add(9*time.Second))
 
-		// The scan that notices the change is where the wait starts again.
+		// Nine seconds after it was last written is not ten.
 		g.clock.tick(9 * time.Second)
 		r, err := g.Once(t.Context())
-		x.NoError(err)
-		x.Zero(r.Settled)
-
-		g.clock.tick(9 * time.Second)
-		r, err = g.Once(t.Context())
 		x.NoError(err)
 		x.Zero(r.Settled)
 
@@ -621,4 +616,43 @@ func TestAJournalThatWillNotAnswer(t *testing.T) {
 		x.NoError(err)
 		x.ErrorIs(r.Err(), errRefused)
 	})
+}
+
+// `wick once` is a fresh process every time something runs it. A gate that only
+// knew what this process had watched would say "not yet" on every single run --
+// a one-shot that can never carry anything, which is the shape most schedulers
+// use.
+func TestSettlingSurvivesARestart(t *testing.T) {
+	x := require.New(t)
+
+	g := newRig(t, withSettle(10*time.Second))
+	// Written a minute ago, and this process has never seen it before.
+	g.src.Add("a.rec", []byte("contents"), start.Add(-time.Minute))
+
+	r, err := g.Once(t.Context())
+	x.NoError(err)
+	x.Equal(1, r.Carried)
+}
+
+// A machine that boots without a network has its clock put right hours later.
+// Until then its idea of now is behind every file it holds, and the file's own
+// time says "written in the future" -- which must not mean "never carry
+// anything".
+func TestAClockThatIsBehindEverything(t *testing.T) {
+	x := require.New(t)
+
+	g := newRig(t, withSettle(10*time.Second))
+	// The file says it was written an hour after now.
+	g.src.Add("a.rec", []byte("contents"), start.Add(time.Hour))
+
+	r, err := g.Once(t.Context())
+	x.NoError(err)
+	x.Zero(r.Settled)
+
+	// What this process has watched happen is still true, so once it has
+	// watched it sit still for long enough, it goes.
+	g.clock.tick(11 * time.Second)
+	r, err = g.Once(t.Context())
+	x.NoError(err)
+	x.Equal(1, r.Carried)
 }

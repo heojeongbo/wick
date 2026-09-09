@@ -6,6 +6,7 @@ import (
 	wickhttp "github.com/heojeongbo/wick/sink/http"
 
 	"github.com/heojeongbo/wick/sink"
+	"github.com/heojeongbo/wick/size"
 )
 
 // Kind is what a configuration calls this one.
@@ -15,6 +16,8 @@ func init() { sink.Register(Kind, func() sink.Spec { return &Spec{} }) }
 
 // A Spec is what a configuration says about an S3-compatible sink.
 type Spec struct {
+	sink.Typed `yaml:",inline"`
+
 	// Bucket is where things go, and Prefix is put in front of every name so
 	// that one bucket can hold more than one thing.
 	Bucket string `yaml:"bucket"`
@@ -38,11 +41,11 @@ type Spec struct {
 	SessionToken    string `yaml:"session_token"`
 
 	// PartSize and Concurrency are how a large object is broken up.
-	PartSize    int64 `yaml:"part_size"`
-	Concurrency int   `yaml:"concurrency"`
+	PartSize    size.Bytes `yaml:"part_size"`
+	Concurrency int        `yaml:"concurrency"`
 
 	// RateLimit is bytes per second; no limit when it is not said.
-	RateLimit int64 `yaml:"rate_limit"`
+	RateLimit size.Bytes `yaml:"rate_limit"`
 
 	CaFile   string `yaml:"ca_file"`
 	CertFile string `yaml:"cert_file"`
@@ -60,9 +63,9 @@ func (s *Spec) New(ctx context.Context) (sink.Sink, error) {
 		AccessKeyID:     s.AccessKeyId,
 		SecretAccessKey: s.SecretAccessKey,
 		SessionToken:    s.SessionToken,
-		PartSize:        s.PartSize,
+		PartSize:        s.PartSize.Int64(),
 		Concurrency:     s.Concurrency,
-		RateLimit:       s.RateLimit,
+		RateLimit:       s.RateLimit.Int64(),
 		TLS: wickhttp.TLS{
 			CAFile:   s.CaFile,
 			CertFile: s.CertFile,
