@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/goccy/go-yaml v1.19.2
+	github.com/heojeongbo/wick/sink/s3 v0.0.0-20260909085302-1caffdab8391
 	github.com/lesomnus/mkot v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/mkotx v0.0.0-20260907012347-f3fd02e2da01
 	github.com/lesomnus/mkot/pretty v0.0.0-20260907012347-f3fd02e2da01
@@ -67,11 +68,3 @@ require (
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
-
-// The sinks that need a third-party SDK are modules of their own, so that a
-// build which does not want one does not carry it. This binary wants them all.
-require github.com/heojeongbo/wick/sink/s3 v0.0.0
-
-// Until the commit that makes them modules of their own is pushed. See the
-// note in sink/s3/go.mod; both sides are dropped in the commit straight after.
-replace github.com/heojeongbo/wick/sink/s3 => ./sink/s3
