@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"iter"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,6 +35,120 @@ func until(t *testing.T, why string, f func() bool) {
 	}
 
 	t.Fatalf("waited for %s and it did not happen", why)
+}
+
+// asked is a trigger that counts how many times it was consulted, wrapping one
+// that decides.
+//
+// It is here so that a test can wait for the loop to have *asked* rather than
+// sleeping and hoping. Waiting for something not to happen is otherwise a
+// guess at how long is long enough, and the answer on a loaded machine is
+// always longer than the guess.
+type asked struct {
+	trigger.Trigger
+
+	mu sync.Mutex
+	n  int
+}
+
+func (a *asked) Fire(s trigger.State) bool {
+	a.mu.Lock()
+	a.n++
+	a.mu.Unlock()
+
+	return a.Trigger.Fire(s)
+}
+
+func (a *asked) count() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	return a.n
+}
+
+// The trigger is what says whether to carry, and every kind of it has to be
+// able to say no.
+//
+// This is the test that was not here, and its absence is why [trigger.Trigger]
+// grew a Fire method that nothing ever called. The loop woke on a timer and
+// carried, so `count: 10` carried at one, `every: 15m` carried every minute,
+// and a spool with no trigger -- documented as "only when asked" -- carried
+// constantly. Every trigger collapsed to the same one-minute poll, on the
+// metered link this whole thing exists to be careful with.
+func TestRunAsksBeforeItCarries(t *testing.T) {
+	for _, tt := range []struct {
+		what string
+		trig trigger.Trigger
+	}{
+		{"nothing written down, which means only when asked", trigger.Any()},
+		{"a count that has not been reached", trigger.Count(10)},
+		{"a size that has not been reached", trigger.Bytes(1 << 30)},
+		{"a clock that has not come round", trigger.Every(time.Hour)},
+		{"room that is not short", trigger.FreeBelow(1)},
+		{"all of them, where one says no", trigger.All(trigger.Count(1), trigger.Count(10))},
+	} {
+		t.Run(tt.what, func(t *testing.T) {
+			x := require.New(t)
+
+			trig := &asked{Trigger: tt.trig}
+			g := newRig(t, withTrigger(trig))
+			g.add("a.rec", "contents")
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			done := make(chan error, 1)
+			go func() { done <- g.Run(ctx) }()
+
+			// The first pass is the one that is not asked, so it happens.
+			until(t, "the first pass", func() bool { return g.cloud.Puts() == 1 })
+
+			g.add("b.rec", "more")
+			g.Nudge()
+
+			// The nudge makes it look, and looking is what asks. Once it has
+			// been asked, whatever it was going to do it has done.
+			until(t, "the trigger to be asked", func() bool { return trig.count() > 0 })
+
+			x.Equal(1, g.cloud.Puts(), "it carried something the trigger said no to")
+
+			cancel()
+			x.NoError(<-done)
+		})
+	}
+}
+
+// And the other way round: a trigger that says yes is carried out.
+func TestRunCarriesWhenTheTriggerSaysSo(t *testing.T) {
+	x := require.New(t)
+
+	trig := &asked{Trigger: trigger.Count(1)}
+	g := newRig(t, withTrigger(trig))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- g.Run(ctx) }()
+
+	// Nothing was there for the first pass, so the one that carries is a later
+	// one -- and every later one is asked. The nudge is in the condition
+	// because it is the only lever on a loop that is otherwise waiting out
+	// [idle], and one that arrives while another is pending says nothing the
+	// first did not.
+	until(t, "the trigger to be asked", func() bool {
+		g.Nudge()
+
+		return trig.count() > 0
+	})
+
+	g.add("a.rec", "contents")
+	g.Nudge()
+
+	until(t, "the pass the trigger allowed", func() bool { return g.cloud.Puts() == 1 })
+
+	cancel()
+	x.NoError(<-done)
 }
 
 // A daemon that has just started on a machine holding a week of files should
@@ -119,7 +234,9 @@ func TestRunWithoutAWatcher(t *testing.T) {
 func TestRunKeepsGoingAfterAPassThatFailed(t *testing.T) {
 	x := require.New(t)
 
-	g := newRig(t)
+	// The first pass is not put to the trigger, so it is the one that fails.
+	// The trigger is what lets the second one happen.
+	g := newRig(t, withTrigger(trigger.Count(1)))
 	g.add("a.rec", "contents")
 	g.src.FailScan(errRefused)
 

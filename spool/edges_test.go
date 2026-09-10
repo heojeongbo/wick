@@ -248,8 +248,14 @@ func TestHowMuchRoomIsLeft(t *testing.T) {
 func TestRunAsksWhatIsWaiting(t *testing.T) {
 	x := require.New(t)
 
-	// A rate fast enough that the timer is what wakes it, rather than a nudge.
-	g := newRig(t, withTrigger(trigger.Every(time.Millisecond)), withRetain(retain.Keep()))
+	// Two triggers doing two jobs. [trigger.Count] is what fires, because the
+	// clock here is hand-wound and [trigger.Every] would never come round on
+	// it. Every is what makes the loop look again quickly, so that the retries
+	// happen at the speed of the test rather than of [idle].
+	g := newRig(t,
+		withTrigger(trigger.Any(trigger.Count(1), trigger.Every(time.Millisecond))),
+		withRetain(retain.Keep()),
+	)
 	g.add("a.rec", "contents")
 	g.cloud.FailPut("thor-top/a.rec", errRefused)
 
@@ -298,10 +304,14 @@ func TestRunEndsQuietlyWhenTheRunningStops(t *testing.T) {
 }
 
 // The nudge goroutine is what a watcher reaches the loop through.
+//
+// The nudge makes the loop look; the trigger is still what decides. So there
+// has to be one here that says yes, or what the watcher asked for is a scan and
+// nothing else.
 func TestAWatcherReachesTheLoop(t *testing.T) {
 	x := require.New(t)
 
-	g := newRig(t)
+	g := newRig(t, withTrigger(trigger.Count(1)))
 	g.add("a.rec", "first")
 
 	ctx, cancel := context.WithCancel(t.Context())

@@ -12,6 +12,7 @@ import (
 	"github.com/lesomnus/z"
 
 	"github.com/heojeongbo/wick/source"
+	"github.com/heojeongbo/wick/trigger"
 )
 
 // idle is how long the loop waits when nothing has anything to say about when
@@ -28,7 +29,24 @@ const idle = time.Minute
 //
 // It does one pass immediately -- a daemon that has just started on a machine
 // holding a week of files should not wait for the interval before saying so --
-// and then waits for whichever comes first of the trigger, a nudge, and [idle].
+// and after that it asks the trigger, every time, before carrying anything.
+//
+// # What waking up and carrying are, and why they are not the same thing
+//
+// The loop wakes on whichever comes first of [idle], a nudge from the watcher,
+// and however long the trigger said it wanted. Waking is cheap: it is a scan
+// and a question. Carrying is not; it is the link this machine shares with
+// whatever it is really for.
+//
+// So [trigger.Trigger.After] says when to *look* and
+// [trigger.Trigger.Fire] says whether to *go*, and the second one is the one
+// that decides. Only [Spool.Once] skips the question, because a caller who
+// reached for it has already answered it.
+//
+// The first pass is not put to the trigger. Every clock trigger measures from a
+// start this has only just had, so asking would mean a daemon that comes up
+// holding a week of recordings sits on them for a full interval -- and the
+// machine it came up on is one nobody is watching.
 func (s *Spool) Run(ctx context.Context) error {
 	l := log.From(ctx).With(slog.String("spool", s.name))
 
@@ -53,6 +71,7 @@ func (s *Spool) Run(ctx context.Context) error {
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
+	asked := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -62,9 +81,26 @@ func (s *Spool) Run(ctx context.Context) error {
 		case <-timer.C:
 		}
 
+		st := s.state(ctx)
+		if asked && !s.trig.Fire(st) {
+			// Woken, looked, and told no. That costs a scan and nothing on the
+			// link, which is the whole arrangement.
+			reset(timer, s.wait(st))
+
+			continue
+		}
+		asked = true
+
 		began := s.now()
 		r, err := s.Once(ctx)
-		s.record(ctx, r, s.now().Sub(began))
+
+		// Read again, because the pass is what changed it, and before the
+		// error is looked at: a pass cut short by the context still did
+		// whatever it did, and the numbers for it are the last ones there will
+		// be.
+		st = s.state(ctx)
+		s.record(ctx, r, s.now().Sub(began), st)
+
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
@@ -77,14 +113,19 @@ func (s *Spool) Run(ctx context.Context) error {
 		}
 		s.say(ctx, r)
 
-		reset(timer, s.wait(ctx))
+		reset(timer, s.wait(st))
 	}
 }
 
-// wait is how long until the next pass, and is never zero: a loop that waits
+// wait is how long until the next look, and is never zero: a loop that waits
 // for no time is a loop that scans continuously.
-func (s *Spool) wait(ctx context.Context) time.Duration {
-	d := s.trig.After(s.state(ctx))
+//
+// It is capped at [idle] even when the trigger asks for longer, because a
+// trigger that answers to the source rather than to the clock cannot say when
+// it will become true -- and the answer is now cheap, since looking is not
+// carrying.
+func (s *Spool) wait(st trigger.State) time.Duration {
+	d := s.trig.After(st)
 	if d <= 0 {
 		return idle
 	}

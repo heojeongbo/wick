@@ -8,6 +8,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/lesomnus/otx"
+
+	"github.com/heojeongbo/wick/trigger"
 )
 
 // The instruments, and what each one is for.
@@ -37,8 +39,10 @@ const (
 // record says what a pass did.
 //
 // It is called with the pass's own numbers rather than reading them back off
-// the journal, so that the cost of being observed is a few adds.
-func (s *Spool) record(ctx context.Context, r Report, took time.Duration) {
+// the journal, so that the cost of being observed is a few adds. The state is
+// handed in for the same reason: the caller has just read it, and reading it
+// again is a second scan of the source for numbers nobody has changed since.
+func (s *Spool) record(ctx context.Context, r Report, took time.Duration, st trigger.State) {
 	spool := metric.WithAttributes(attribute.String("spool", s.name))
 
 	otx.Int64Counter(ctx, mCarried,
@@ -65,8 +69,6 @@ func (s *Spool) record(ctx context.Context, r Report, took time.Duration) {
 		metric.WithDescription("things set aside after too many attempts"),
 		metric.WithUnit("{item}"),
 	).Record(ctx, int64(r.SetAside), spool)
-
-	st := s.state(ctx)
 
 	otx.Int64Gauge(ctx, mWaiting,
 		metric.WithDescription("bytes waiting to be carried"),

@@ -153,8 +153,22 @@ type Spool struct {
 	// nudge before the first is taken says nothing the first did not.
 	wake chan struct{}
 
-	// last is when a carry last happened, for the clock trigger.
+	// last is when a carry last happened. It stays zero until one has, which is
+	// what keeps `wick.carry.last_success` from reading as healthy on a daemon
+	// that has never managed to carry anything -- the exact failure that metric
+	// exists to make visible.
 	last time.Time
+
+	// born is when this spool was made, and is what the clock trigger measures
+	// from until there is a carry to measure from instead.
+	//
+	// It is a second field rather than a seeded `last` because the two are
+	// asked different questions. "How long since something was carried" has no
+	// answer before the first one and must not be given a made-up one. "How
+	// long has this been waiting" always has one: since it started. Without
+	// this, a spool whose link is down never carries, so `last` stays zero, so
+	// [trigger.Every] never fires, so it never tries again.
+	born time.Time
 }
 
 type sighting struct {
@@ -266,6 +280,7 @@ func New(c Config) (*Spool, error) {
 		free:    free,
 		seen:    map[string]sighting{},
 		wake:    make(chan struct{}, 1),
+		born:    now(),
 	}, nil
 }
 

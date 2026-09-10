@@ -565,14 +565,17 @@ func (s *Spool) state(ctx context.Context) trigger.State {
 	s.mu.Unlock()
 
 	if last.IsZero() {
-		// Nothing has been carried yet, so the clock has been running since
-		// the process started. Treating it as forever would carry at once on
-		// every restart, which on a machine that restarts a lot is a carry
-		// that never settles.
-		st.Since = 0
-	} else {
-		st.Since = s.now().Sub(last)
+		// Nothing has been carried yet, so the clock runs from when this spool
+		// was made. Not from the beginning of time: that would fire a clock
+		// trigger the instant a restarted daemon looked, which on a machine
+		// that restarts a lot is a carry that never settles. And not zero,
+		// which was the other way round and worse -- a spool whose link is
+		// down carries nothing, so nothing sets `last`, so a `Since` pinned at
+		// zero means [trigger.Every] never fires and the link coming back
+		// changes nothing.
+		last = s.born
 	}
+	st.Since = s.now().Sub(last)
 
 	return st
 }
