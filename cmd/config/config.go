@@ -34,7 +34,10 @@ type Config struct {
 func ReadFromFile(p string) (*Config, error) {
 	b, err := os.ReadFile(p)
 	if err != nil {
-		return nil, z.Err(err, "open")
+		// Not wrapped. A *fs.PathError already begins "open <path>:", so
+		// putting "open" in front of it produced "read config: open: open
+		// /x.yaml: no such file or directory".
+		return nil, err
 	}
 
 	// "${env:NAME}" and "${env:NAME:-default}" are resolved before the file is

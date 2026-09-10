@@ -9,13 +9,33 @@ import (
 
 	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/xli"
+	"github.com/lesomnus/xli/flg"
 	"github.com/lesomnus/z"
 )
 
-func NewCmdRun() *xli.Command {
+func NewCmdRun(global func() flg.Flags) *xli.Command {
 	return &xli.Command{
 		Name:  "run",
 		Brief: "watch, and carry what turns up",
+		Synop: synop(`The daemon. It does not return until it is told to stop.
+
+It carries once at startup -- a machine that has just come up holding a week of
+recordings should not sit on them for an interval first -- and after that it
+asks each spool's trigger before every pass. Waking up is a scan; carrying is
+the link this machine shares with whatever it is really for, so the trigger is
+what decides.
+
+SIGTERM or the first interrupt means "finish what you are doing", and a carry
+most of the way through half a gigabyte is worth finishing. A second one means
+now, and costs the bytes in flight and never a file: a carry that is cut off
+has written no record, so the next pass sends it again.
+
+With ` + "`health.endpoint`" + ` set it also answers /healthz and /readyz. Liveness stays
+up while the link is down, because the link being down is what this exists for
+and a probe that failed on it would restart the whole fleet mid-outage.
+Readiness fails only when the journal cannot be reached.`),
+
+		Flags: global(),
 
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			c := use_config.Must(ctx)

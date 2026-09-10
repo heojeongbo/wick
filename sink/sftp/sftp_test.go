@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -423,12 +424,50 @@ func TestAConnectionThatCannotBeMade(t *testing.T) {
 	})
 	x.NoError(err)
 
+	// What it said, rather than what it wraps. The chain is flattened here on
+	// purpose, and the test below is why.
 	err = s.Put(t.Context(), "a.rec", bytes.NewReader([]byte("x")), sink.Meta{Size: 1})
-	x.ErrorIs(err, errRefused)
 	x.ErrorContains(err, "reach")
+	x.ErrorContains(err, errRefused.Error())
 
 	_, err = s.Stat(t.Context(), "a.rec")
-	x.ErrorIs(err, errRefused)
+	x.ErrorContains(err, errRefused.Error())
+}
+
+// A server that cannot be reached must not be mistaken for one that does not
+// hold the name.
+//
+// Dialling reads the private key and the known_hosts, and either being absent
+// is an *fs.PathError. Left in the chain it would make [Sink.Stat] answer
+// [fs.ErrNotExist] -- the one answer the engine acts on, which it reads as a
+// write that did not stick. It would send the file again every pass until the
+// item was set aside, and `wick check` would call the sink reachable.
+func TestAConnectionFailureIsNotAMissingName(t *testing.T) {
+	for _, tt := range []struct {
+		what string
+		opts wicksftp.Options
+	}{
+		{"a known_hosts that is not there", wicksftp.Options{
+			Address: "h", User: "a", Password: "b",
+			KnownHosts: filepath.Join(t.TempDir(), "nope"),
+		}},
+		{"a key file that is not there", wicksftp.Options{
+			Address: "h", User: "a", InsecureIgnoreHostKey: true,
+			KeyFile: filepath.Join(t.TempDir(), "nope"),
+		}},
+	} {
+		t.Run(tt.what, func(t *testing.T) {
+			x := require.New(t)
+
+			s, err := wicksftp.New(tt.opts)
+			x.NoError(err)
+
+			_, err = s.Stat(t.Context(), "a.rec")
+			x.Error(err)
+			x.NotErrorIs(err, fs.ErrNotExist,
+				"a server that could not be reached looks exactly like one that does not hold the name")
+		})
+	}
 }
 
 func TestAConnectionThatWillNotBeLetGoOf(t *testing.T) {

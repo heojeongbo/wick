@@ -11,6 +11,14 @@ package cmd
 // whether or not it names one. The cloud SDK is several megabytes on a machine
 // that may only ever write to a directory next door.
 import (
+	"context"
+	"strings"
+
+	"github.com/lesomnus/xli"
+
+	"github.com/heojeongbo/wick/sink"
+	"github.com/heojeongbo/wick/source"
+
 	_ "github.com/heojeongbo/wick/source/dir"
 
 	_ "github.com/heojeongbo/wick/sink/azure"
@@ -21,3 +29,32 @@ import (
 	_ "github.com/heojeongbo/wick/sink/sftp"
 	_ "github.com/heojeongbo/wick/sink/webdav"
 )
+
+// NewCmdKinds says what the list above came to.
+//
+// The registries have known this all along and there was no way to ask them.
+// The only way to see the list was to write a `type:` that is not one and read
+// the refusal, which is a strange thing to have to do on purpose.
+func NewCmdKinds() *xli.Command {
+	return &xli.Command{
+		Name:  "kinds",
+		Brief: "list what this build can carry from, and to",
+		Synop: synop(`What ` + "`type:`" + ` may say in a configuration.
+
+A kind becomes available by its package being imported, so this is a property
+of the build and not of the machine. A build that leaves the cloud sinks out
+does not carry their SDKs either, which is most of the binary.
+
+docs/SINKS.md says what each one wants written under it.`),
+
+		// No configuration is read. This is the command somebody runs *before*
+		// they have one, and one that needed a valid config to say what a
+		// config may contain would be a circle.
+		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
+			cmd.Printf("sources:\n    %s\n", strings.Join(source.Kinds(), "\n    "))
+			cmd.Printf("sinks:\n    %s\n", strings.Join(sink.Kinds(), "\n    "))
+
+			return nil
+		}),
+	}
+}

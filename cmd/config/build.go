@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"slices"
 
-	"github.com/lesomnus/otx/log"
 	"github.com/lesomnus/z"
 
 	"github.com/heojeongbo/wick/journal"
@@ -24,9 +25,66 @@ type Wick struct {
 	Journal journal.Journal
 	Group   *spool.Group
 
+	// Sinks are the ones that were made, by the name the configuration gave
+	// them. A spool holds the ones it carries to; this is here so that
+	// something can ask each of them about itself without going through a
+	// spool -- which is what `wick check` is.
+	Sinks map[string]sink.Sink
+
 	// closers are the sinks that had something to let go of, in the order they
 	// were opened.
 	closers []sink.Closer
+}
+
+// Reach asks every sink that can be asked whether it is there.
+//
+// Building a sink and reaching one are different things, and most of these are
+// built without touching the network on purpose -- a role that cannot be
+// assumed should fail a carry and be retried, not stop a daemon from starting.
+// The cost of that is a configuration which builds perfectly and works not at
+// all: a bucket that is not there, a key that is not allowed, a known_hosts the
+// sftp sink only reads when it first dials.
+//
+// [sink.Stater] is what closes the gap. Asking about a name is the cheapest
+// thing any of these can be asked -- it reads nothing and writes nothing -- and
+// "I do not hold that" is a complete answer, because being able to say it at
+// all means the far end was reached and the credentials were accepted.
+//
+// A sink that cannot be asked is not a failure. It was still built, and
+// building is what refuses a key that is not base64 or a certificate without
+// its key. It is left out of the answer rather than counted as reached, so that
+// nothing claims to have checked something it did not.
+func (w *Wick) Reach(ctx context.Context) ([]string, error) {
+	// A name nothing is called. If something is, the answer is still that the
+	// store was reached, which is the only thing being asked.
+	const probe = ".wick-check"
+
+	names := make([]string, 0, len(w.Sinks))
+	for name := range w.Sinks {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	var (
+		errs    []error
+		reached []string
+	)
+	for _, name := range names {
+		s, ok := w.Sinks[name].(sink.Stater)
+		if !ok {
+			continue
+		}
+
+		if _, err := s.Stat(ctx, probe); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			errs = append(errs, z.Err(err, "the sink %q", name))
+
+			continue
+		}
+
+		reached = append(reached, name)
+	}
+
+	return reached, errors.Join(errs...)
 }
 
 // Close lets go of everything this opened, and of nothing it was handed.
@@ -53,7 +111,10 @@ func (c *Config) Build(ctx context.Context) (*Wick, error) {
 
 	jnl, err := bolt.Open(c.Journal.Path)
 	if err != nil {
-		return nil, err
+		// Named, like every other failure in here. Without this a bad
+		// `journal.path` surfaces as bolt's own message with nothing in it
+		// saying which of the several paths in a configuration it was about.
+		return nil, z.Err(err, "the journal at %q", c.Journal.Path)
 	}
 	w.Journal = jnl
 
@@ -61,6 +122,7 @@ func (c *Config) Build(ctx context.Context) (*Wick, error) {
 	// its connections, which on a machine with one uplink is the whole point of
 	// naming them.
 	sinks := make(map[string]sink.Sink, len(c.Sinks))
+	w.Sinks = sinks
 	for name, sc := range c.Sinks {
 		s, err := sc.New(ctx)
 		if err != nil {
@@ -75,7 +137,9 @@ func (c *Config) Build(ctx context.Context) (*Wick, error) {
 		}
 	}
 
-	l := log.From(ctx)
+	// What is being watched is a thing being done, not a thing going wrong, so
+	// it is only said when somebody asked -- which for `run` is always.
+	l := Say(ctx)
 
 	spools := make([]*spool.Spool, 0, len(c.Spools))
 	for _, sc := range c.Spools {

@@ -26,8 +26,8 @@ type Spec struct {
 	// Password is the other way. One of the two, not both. Write either as
 	// "${env:...}" so that it is named in the file and not held in it.
 	KeyFile       string `yaml:"key_file"`
-	KeyPassphrase string `yaml:"key_passphrase"`
-	Password      string `yaml:"password"`
+	KeyPassphrase string `yaml:"key_passphrase" wick:"secret"`
+	Password      string `yaml:"password" wick:"secret"`
 
 	// KnownHosts is the file the server's key is checked against, and is
 	// required: a host key nobody checks is a sink that will one day be

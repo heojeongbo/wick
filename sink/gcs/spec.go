@@ -28,7 +28,7 @@ type Spec struct {
 	// CredentialsJson is the same thing held here rather than named, for a
 	// deployment whose secrets arrive as environment variables. Write it as
 	// "${env:...}".
-	CredentialsJson string `yaml:"credentials_json"`
+	CredentialsJson string `yaml:"credentials_json" wick:"secret"`
 
 	// Endpoint is the store, and is Google's own when it is not said.
 	Endpoint string `yaml:"endpoint"`

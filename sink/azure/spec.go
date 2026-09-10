@@ -29,9 +29,9 @@ type Spec struct {
 	// One of these, or none of them. None means a managed identity, which is
 	// the way round to prefer: the platform mints it, rotates it and can take
 	// it away. Write any of them as "${env:...}".
-	ConnectionString string `yaml:"connection_string"`
-	AccountKey       string `yaml:"account_key"`
-	Sas              string `yaml:"sas"`
+	ConnectionString string `yaml:"connection_string" wick:"secret"`
+	AccountKey       string `yaml:"account_key" wick:"secret"`
+	Sas              string `yaml:"sas" wick:"secret"`
 
 	// BlockSize and Concurrency are how a large blob is broken up. Each
 	// concurrent upload holds a buffer of one block.

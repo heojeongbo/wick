@@ -29,7 +29,7 @@ type Spec struct {
 	Headers map[string]string `yaml:"headers"`
 	// Username and Password are Basic authentication.
 	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Password string `yaml:"password" wick:"secret"`
 	// TokenFile holds a bearer token and is read at every request, so one that
 	// something else renews is picked up without a restart.
 	TokenFile string `yaml:"token_file"`

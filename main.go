@@ -2,16 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/heojeongbo/wick/cmd"
 )
 
 func main() {
+	args := os.Args[1:]
+
 	c := cmd.NewCmdRoot()
-	if err := c.Run(context.Background(), os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
-		os.Exit(1)
-	}
+	c.ErrWriter = os.Stderr
+
+	os.Exit(cmd.Report(c, args, c.Run(context.Background(), args)))
 }

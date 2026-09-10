@@ -8,20 +8,30 @@ import (
 	"github.com/lesomnus/xli/flg"
 )
 
-func NewCmdOnce() *xli.Command {
+func NewCmdOnce(global func() flg.Flags) *xli.Command {
 	return &xli.Command{
 		Name:  "once",
 		Brief: "carry what is due, once, and stop",
-		Synop: "wick once [--spool NAME]",
+		Synop: synop(`One pass, and then it exits. This is what a cron entry or a systemd timer
+calls, and what somebody standing at the machine runs.
 
-		Flags: flg.Flags{
-			&flg.String{Name: "spool", Brief: "only this one"},
-		},
+It does not consult the trigger. Whoever ran this has already decided that now
+is the time, and a "once" that answered "not yet" would do nothing on a machine
+somebody had walked up to. ` + "`wick run`" + ` is the one that asks.
 
-		// This is what something else's schedule calls. It does not consult
-		// the trigger: whoever ran it has already decided that now is the
-		// time, and a `once` that answered "not yet" would be a `once` that
-		// does nothing on a machine somebody has walked up to.
+It exits non-zero when something did not happen, so that whatever ran it can
+tell "there was nothing to do" from "it did not work". A file is only recorded
+as carried once every destination has confirmed it, so a pass that half worked
+leaves the file alone and says so.`),
+
+		Flags: append(global(),
+			&flg.String{
+				Name:  "spool",
+				Alias: 's',
+				Brief: "carry only this spool, instead of every one of them",
+			},
+		),
+
 		Handler: xli.OnRun(func(ctx context.Context, cmd *xli.Command, next xli.Next) error {
 			c := use_config.Must(ctx)
 

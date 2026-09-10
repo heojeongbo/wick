@@ -272,7 +272,17 @@ func (s *Sink) connect(ctx context.Context) (Client, error) {
 
 	c, err := s.dial(ctx, s.opts)
 	if err != nil {
-		return nil, z.Err(err, "reach %q", s.opts.Address)
+		// Flattened with %v rather than wrapped with %w, and this is the one
+		// place in this package that does it.
+		//
+		// Dialling reads the private key and the known_hosts, and either of
+		// those being absent is an *fs.PathError. Left in the chain, that
+		// makes "I could not reach the server" indistinguishable by
+		// [errors.Is] from "I do not hold that name" -- which is the one
+		// answer a sink gives that the engine acts on. It would read a missing
+		// known_hosts as a write that did not stick and send the file again,
+		// every pass, until the item was set aside.
+		return nil, fmt.Errorf("reach %q: %v", s.opts.Address, err)
 	}
 	s.client = c
 

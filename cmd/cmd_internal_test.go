@@ -396,3 +396,56 @@ func TestWhenTheListingCannotBeMade(t *testing.T) {
 
 	x.ErrorIs(runIt(t, "status", "--quarantined").Err, errRefused)
 }
+
+// The JSON form walks the journal the same two times the text form does, and
+// each of them can fail on its own.
+func TestJSONWhenTheJournalWillNotAnswer(t *testing.T) {
+	t.Run("the counting", func(t *testing.T) {
+		x := require.New(t)
+
+		was := openJournal
+		openJournal = func(string) (journal.Journal, error) { return refusingJournal{}, nil }
+		t.Cleanup(func() { openJournal = was })
+
+		x.ErrorIs(runIt(t, "status", "--json").Err, errRefused)
+	})
+	t.Run("the listing", func(t *testing.T) {
+		x := require.New(t)
+
+		was := openJournal
+		openJournal = func(string) (journal.Journal, error) { return &summarisingJournal{}, nil }
+		t.Cleanup(func() { openJournal = was })
+
+		x.ErrorIs(runIt(t, "status", "--json", "--quarantined").Err, errRefused)
+	})
+}
+
+// mixedJournal holds one that was set aside and one that was not, so that the
+// listing has something to leave out.
+type mixedJournal struct{ journal.Journal }
+
+func (mixedJournal) Range(context.Context, string) iter.Seq2[journal.Record, error] {
+	return func(yield func(journal.Record, error) bool) {
+		if !yield(journal.Record{Key: "fine.rec", State: journal.Carried}, nil) {
+			return
+		}
+		yield(journal.Record{Key: "a.rec", State: journal.Quarantined, Err: "it would not go"}, nil)
+	}
+}
+
+func (mixedJournal) Close() error { return nil }
+
+// --quarantined lists the ones that were set aside, and only those.
+func TestJSONListsOnlyWhatWasSetAside(t *testing.T) {
+	x := require.New(t)
+
+	was := openJournal
+	openJournal = func(string) (journal.Journal, error) { return mixedJournal{}, nil }
+	t.Cleanup(func() { openJournal = was })
+
+	r := runIt(t, "status", "--json", "--quarantined")
+	x.NoError(r.Err)
+	x.Contains(r.Stdout, "a.rec")
+	x.Contains(r.Stdout, "it would not go")
+	x.NotContains(r.Stdout, "fine.rec")
+}

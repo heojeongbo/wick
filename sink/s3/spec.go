@@ -37,8 +37,8 @@ type Spec struct {
 	// is available. Written here, write them as "${env:...}" so that they are
 	// named in the file and not held in it.
 	AccessKeyId     string `yaml:"access_key_id"`
-	SecretAccessKey string `yaml:"secret_access_key"`
-	SessionToken    string `yaml:"session_token"`
+	SecretAccessKey string `yaml:"secret_access_key" wick:"secret"`
+	SessionToken    string `yaml:"session_token" wick:"secret"`
 
 	// Profile is the one to read out of the shared configuration, for a
 	// machine that has more than one.

@@ -25,7 +25,7 @@ type Spec struct {
 	// Username and Password are Basic authentication, which is what most of
 	// these servers ask for.
 	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Password string `yaml:"password" wick:"secret"`
 	// TokenFile holds a bearer token and is read at every request.
 	TokenFile string `yaml:"token_file"`
 
