@@ -56,6 +56,31 @@ like a tidy-up. The source's is wrapped in a sentinel (`errGone`) at the one
 place it can arise, and the sink's is never given that treatment. This was found
 by a test, not by reading.
 
+## Waking up and carrying are two decisions
+
+`Trigger` has two methods and they are not alternatives.
+
+`After` says when to *look* again. `Fire` says whether to *go*. The loop wakes
+on whichever comes first of the trigger's answer, a nudge from the watcher, and
+a one-minute floor — and then asks `Fire` before it carries anything.
+
+The floor exists because a trigger that answers to the source rather than to the
+clock cannot say when it will become true: `count: 10` has no idea when the
+tenth file will appear, so it answers "nothing to wait for" and the loop looks
+again in a minute. That is affordable precisely because looking is a scan and
+carrying is the link this machine shares with whatever it is really for.
+
+Getting this wrong is not a small mistake, and it was made: `Fire` had no caller
+at all until it was noticed, so the loop woke and carried unconditionally, and
+every trigger collapsed into the same one-minute poll. `every: 15m` carried
+every minute. On a metered uplink that is the difference this whole thing exists
+to make.
+
+The first pass is not put to the trigger. Every clock trigger measures from a
+start the process has only just had, so asking would mean a daemon coming up on
+a week of recordings sitting on them for a full interval. `Once` never asks at
+all, because a caller who reached for it has already answered.
+
 ## The settle gate, and why it is in the engine
 
 A file that is still being written looks exactly like a file that has been
@@ -125,6 +150,22 @@ nobody was watching.
 The same rule elsewhere: a trigger with nothing set never fires; a naming
 template that says nothing means the name the file already had; a filesystem
 that cannot be measured reads as "nobody could say" and never as "no room".
+
+## What is printed, and to whom
+
+`wick config` is the command this program's own error messages send people to,
+and its output is what gets pasted into an issue. So it does not print secrets:
+they read `(set)`, and `--reveal` is a thing somebody has to type. The fields
+that are secret carry a `wick:"secret"` tag next to the field rather than being
+listed somewhere central, so a sink written outside this repository is covered
+without this repository having heard of it.
+
+The daemon's log and a one-shot command's output are not the same thing either.
+`run`'s log is the whole of how anybody knows what it is doing. `config` and
+`status` and `once` answer a question, and three lines about having found a file
+are in front of the answer rather than part of it — so those are quiet unless
+`-v` asks. Warnings are not: a `WICK_*` variable that answers to nothing is
+somebody having tried to change something and not changed it.
 
 ## The one metric that matters
 

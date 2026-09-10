@@ -62,6 +62,18 @@ type Spec struct {
 func (s *Spec) New(ctx context.Context) (sink.Sink, error) { ... }
 ```
 
+**A field holding a secret says so.** `wick config` is what somebody runs and
+pastes into an issue, so a password printed there is a password in a bug
+tracker. Tag it and it prints as `(set)`:
+
+```go
+Password string `yaml:"password" wick:"secret"`
+```
+
+A tag rather than a list kept somewhere central, so that a sink written outside
+this repository is covered without this repository having heard of it. `--reveal`
+gives back the form that loads again.
+
 `sink.Typed` embedded inline is not optional. A configuration is read strictly —
 a key nothing answers to is refused, because that is what a typo looks like —
 and without it the one key every spec is guaranteed to be handed (`type:`) would
@@ -130,9 +142,15 @@ Adding one:
    that names your module does not exist yet.
 2. The root's `go.mod` requires `github.com/heojeongbo/wick/sink/mine` with a
    matching `replace ... => ./sink/mine`.
-3. Add it to `go.work`, `scripts/test.sh` (`MODULES`), the two loops in
-   `.github/workflows/ci.yaml`, and the `COPY` lines in the `Dockerfile`.
+3. Add it to `go.work`. That is the list; `modules_test.go` checks the other
+   six against it and names each one you have not done yet:
+   `scripts/test.sh` (`MODULES`), the two loops *and the two
+   `cache-dependency-path` blocks* in `.github/workflows/ci.yaml`, the two
+   blocks in the `Dockerfile`, and the tag loop below.
 4. Import it in `cmd/kinds.go`.
+5. Give it a block in `wick.yaml` and a section in `SINKS.md`, or the claim
+   that those two are the documentation stops being true. Nothing checks this
+   one.
 
 ## Releasing
 
@@ -177,7 +195,19 @@ what says when one of them has fallen behind.
 ./scripts/test.sh
 ```
 
-gofmt, vet, tests and a hundred per cent of statements, per module. The reason
+gofmt, vet, tests and a hundred per cent of statements, per module. Told
+nothing it runs everything and holds the floor, which is what CI does and what a
+change is finished against. While making one:
+
+```sh
+MODULE=./sink/mine ./scripts/test.sh          # one module; the floor still means something
+PKG=./sink/mine/... ./scripts/test.sh -run TestPut -v
+COVER=off PKG=./sink/mine/... ./scripts/test.sh
+```
+
+`PKG` reports the number and does not hold it, and says which it is doing: a run
+that left most of the tests out has nothing to say about whether everything is
+covered, and failing on it would only teach you to stop reading it. The reason
 for the floor is in the script: this is a thing that deletes files, and every
 branch nobody has run is a branch that will first run on a machine holding the
 only copy of something.

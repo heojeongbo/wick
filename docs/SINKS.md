@@ -26,6 +26,30 @@ Every sink also checks the length before it finishes, so a spool told
 `verify: false` still catches a short stream. That is the floor; the read-back
 is the thing above it.
 
+## Before you trust any of this
+
+```sh
+$ wick check
+recordings: dir, 2 destinations, every 15m0s, then delete after 24h0m0s
+cloud: s3, reached
+onsite: sftp, reached
+ok
+```
+
+`wick config` reads the file and asks whether it makes sense as a document.
+`wick check` opens everything in it and then asks each sink whether it holds a
+name nothing is called — which reads nothing, writes nothing, and is a complete
+answer, because being able to say "I do not hold that" means the far end was
+reached and the credentials were taken.
+
+Most of these are built without touching the network on purpose, so a bucket
+that is not there, a role that is not allowed, and an `sftp` `known_hosts` that
+is missing all look perfectly fine until the first carry. This is the command
+that finds them at a time somebody is looking.
+
+Secrets written below are printed as `(set)` by `wick config`. `--reveal` gives
+back the form that can be loaded again.
+
 ---
 
 ## `s3` — AWS, and everything that speaks its language

@@ -1,6 +1,5 @@
 /.devcontainer/
 /.git/
-/.github/
 /dist/
 
 /.dockerignore
@@ -12,3 +11,9 @@
 # into the image. It is the documentation, and the tests read it: a file that
 # says what may be written and does not itself load is worse than none, and it
 # has caught itself out once already.
+#
+# Nor is .github/ or docs/, for the same reason and a sharper one. modules_test.go
+# reads both -- go.work is the list of modules and everything else is checked
+# against it, including the two CI loops, the two cache blocks and the release
+# tag recipe. CI's only run of the gate is this image, so a check that cannot
+# see those files is a check that does not run where it matters.

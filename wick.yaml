@@ -3,7 +3,8 @@
 # Nothing here is on that was not written down. There are no spools, so this
 # configuration carries nothing; it is here to say what may be written and what
 # each thing means; docs/SINKS.md says the rest. `wick config` prints what the
-# app ended up with, which is how to check.
+# app ended up with, and `wick check` opens it all and says whether it would
+# actually work on this machine. `wick kinds` lists what `type:` may say.
 #
 # What is said here can be overruled, and the last word wins:
 #

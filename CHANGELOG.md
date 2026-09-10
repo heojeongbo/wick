@@ -6,6 +6,74 @@ which is the build and not the release.
 
 ## Unreleased
 
+A pass over the surfaces: what an operator reads when they type `--help`, what a
+consumer reads on pkg.go.dev, and what a contributor sees when the gate fails.
+
+**Fixed**
+
+- **`Run` never asked the trigger.** `Trigger.Fire` had no caller anywhere. The
+  loop woke on a timer and carried, so every trigger collapsed into the same
+  one-minute poll: `every: 15m` carried every minute, `count: 10` carried at
+  one, and a spool with no trigger — documented in three places as "only when
+  asked" — carried constantly. **A deployment that relied on `every:` to space
+  out its uploads has been uploading sixty times more often than it asked to.**
+  The first pass is still not put to the trigger, so a daemon coming up on a
+  week of recordings still hands them over at once.
+- `spool` measured "how long since the last carry" from the last *successful*
+  one, and pinned it to zero until there was one. With the fix above that would
+  have meant a spool whose link was down never firing a clock trigger again. It
+  measures from when the spool was made until there is a carry to measure from.
+- The `sftp` sink answered a connection failure with an error that satisfied
+  `errors.Is(err, fs.ErrNotExist)`, because dialling reads the key and the
+  `known_hosts` and either being absent is an `*fs.PathError`. That is the one
+  answer a sink gives which the engine acts on — it reads it as a write that did
+  not stick — so a missing `known_hosts` meant re-sending the file every pass
+  until it was set aside.
+- `--config` after the subcommand was "unknown flag". `wick once --config x.yaml`
+  works.
+- A bad `journal.path` surfaced as bbolt's own message with nothing saying which
+  path it was about.
+- `go generate ./... && ./scripts/test.sh` failed on the file the first command
+  had just written: the generated version file was not gofmt-clean.
+- `.gitignore` had `/cover.out`, anchored to the root, so four of the five
+  profiles the gate writes showed up as untracked after every run.
+- `wick.yaml` was not in the CI path filter, so the test written to guard it
+  never ran on a commit that changed it.
+
+**Changed**
+
+- **The one-shot commands are quiet.** `config`, `status`, `once` and `forget`
+  wrote a daemon log line to stderr before doing anything; `-v`/`--verbose` puts
+  it back. `run` is unchanged.
+- **`wick config` does not print secrets.** They read `(set)`; `--reveal` gives
+  back the form that loads again. A sink declares its own with a
+  `wick:"secret"` tag, so one written elsewhere is covered without this
+  repository having heard of it.
+- Every command has a description saying what it is for, every flag has a
+  letter, and a misuse prints the way out: `wick statuss` suggests `status`, and
+  a missing argument prints that command's help.
+- The gate prints 1.7 KB where it printed 23.5 KB, and takes `MODULE`, `PKG`
+  and `COVER=off` so that it can be run while you work rather than only at the
+  end.
+
+**Added**
+
+- `wick kinds` — what this build can carry from and to. The registries have
+  always known and there was no way to ask.
+- `wick check` — opens everything the configuration describes and then asks each
+  sink whether it holds a name nothing is called. Carries nothing, deletes
+  nothing, and leaves no journal behind if there was none.
+- `wick completion zsh`.
+- `wick status --json`.
+- Runnable examples for `spool`, `trigger`, `retain`, `naming`, `sink`, `size`
+  and `sinktest`, where there were none in any package.
+- `source.Rooted`, which names the interface that decides whether
+  `trigger.FreeBelow` and `retain.WhenFreeBelow` can work at all. It was an
+  undeclared type assertion in `spool`.
+- `size.Parse`, `config.Wick.Sinks` and `config.Wick.Reach`.
+- A gate check that every list of modules in the repository agrees with
+  `go.work` — the two that used to fail silently are the two that caused v0.2.1.
+
 ## v0.2.1
 
 **Fixed**

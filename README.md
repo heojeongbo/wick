@@ -43,6 +43,12 @@ the file is only *carried* when both have confirmed it. A restart in the middle
 of a fan-out does not send again to the one that already had it -- on a metered
 link that is the difference between a retry and a bill.
 
+**Nothing is carried until the trigger says so.** `wick run` wakes on a nudge or
+a timer, looks, and asks; only `wick once` skips the question, because whoever
+ran it has already answered it. Waking is a scan and carrying is the link this
+machine shares with whatever it is really for, so the two are not the same
+decision.
+
 **A file is not eligible until it has stopped changing.** A file that is still
 being written looks exactly like a file that has been written. `settle_for` is
 the only thing that tells them apart, and it is why the filesystem watcher is
@@ -52,11 +58,23 @@ true.
 ## Getting started
 
 ```sh
+$ wick kinds           # what this build can carry from, and to
 $ wick config          # what it thinks it has been told
+$ wick check           # whether that would actually work on this machine
 $ wick once            # carry what is due, once
 $ wick status          # what the journal knows
 $ wick run             # watch, and carry what turns up
 ```
+
+The first three move nothing. `wick check` is the one worth knowing about: it
+opens everything the configuration describes and then asks each destination
+whether it holds a name nothing is called, which is how a bucket that is not
+there, a role that is not allowed and a `known_hosts` that is missing all get
+found before the daemon is restarted rather than at three in the morning.
+
+`wick --help`, and `--help` on any of them, says the rest. Secrets are printed
+as `(set)` unless `--reveal` says otherwise, because `wick config` output is
+what gets pasted into a bug report.
 
 `wick.yaml` is the configuration and is also the documentation: every key in it
 carries a comment saying what it does and when to reach for it. What it says can
@@ -136,13 +154,22 @@ report, err := s.Once(ctx)   // or s.Run(ctx) to keep going
 
 | | |
 | --- | --- |
-| `source` | where things accumulate. Three methods, plus `Remover`, `Mover` and `Watcher` for what an implementation can also do |
+| `source` | where things accumulate. Two methods, plus `Remover`, `Mover`, `Watcher` and `Rooted` for what an implementation can also do |
 | `sink` | where they go. One method, plus `Stater` for reading one back |
 | `journal` | what has already gone |
 | `trigger` | when to go: `Every`, `Count`, `Bytes`, `FreeBelow`, `Any`, `All` |
 | `retain` | what becomes of the original: `Keep`, `Delete`, `Grace`, `Move`, `WhenFreeBelow`, `First` |
 | `naming` | what a thing is called once it is somewhere else |
 | `spool` | the engine |
+
+Each of those has runnable examples on
+[pkg.go.dev](https://pkg.go.dev/github.com/heojeongbo/wick). They are compiled
+and run by `go test`, so unlike a block in a README they cannot quietly stop
+being true.
+
+One thing to know before writing a `Dest` by hand: `Verify` is false by default
+in Go and true by default in YAML, so a spool built in code carries without
+reading anything back unless it is asked to. Set it.
 
 Adding a kind of sink is implementing one method and calling `sink.Register`
 from your package's `init`. Importing your package is then what makes
@@ -171,6 +198,19 @@ $ docker buildx bake build test  # what CI runs; binaries land in ./dist
 $ docker buildx bake app --load
 $ docker run --rm ghcr.io/heojeongbo/wick:local version
 ```
+
+Told nothing it runs everything and holds the floor, which is what a change is
+finished against. While making one, three things narrow it:
+
+```sh
+$ MODULE=./sink/s3 ./scripts/test.sh          # one module, floor still held
+$ PKG=./spool/... ./scripts/test.sh -run TestSettle
+$ COVER=off PKG=./naming/... ./scripts/test.sh
+```
+
+`PKG` reports the coverage without holding it — a run that left most of the
+tests out has nothing to say about whether everything is covered. CI sets none
+of them.
 
 There is a hundred per cent statement coverage gate, and the reason is in
 `scripts/test.sh`: this is a thing that deletes files, and every branch nobody
