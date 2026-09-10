@@ -23,8 +23,13 @@ on:
       - go.mod
       - go.sum
       - go.work
+      - go.work.sum
       - main.go
       - scripts/**
+      # There is a test that loads this file, written after it once did not.
+      # Without this line a commit that changes only this file runs no CI at
+      # all, so the guard would never run on the thing it guards.
+      - wick.yaml
   pull_request:
     branches:
       - main

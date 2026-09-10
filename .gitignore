@@ -1,2 +1,9 @@
 /dist
-/cover.out
+
+# One per module, and the leading slash used to be on this line -- which
+# anchored it to the root and left the other four showing up as untracked after
+# every gate run.
+cover.out
+
+# Written by scripts/gen-version-file.sh, which the Docker build runs.
+/cmd/version/version.g.go
