@@ -20,10 +20,11 @@ import (
 
 // State is what the spool knows when it asks whether it is time.
 type State struct {
-	// Pending is how many things are waiting to be carried, and Bytes is how
-	// much they come to.
+	// Pending is how many things are waiting to be carried.
 	Pending int
-	Bytes   int64
+
+	// Bytes is what those come to.
+	Bytes int64
 
 	// FreeBytes is how much room is left where they are. It is zero when
 	// nobody could say, which is why [FreeBelow] treats zero as "no answer"

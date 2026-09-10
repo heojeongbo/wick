@@ -43,6 +43,23 @@ var units = []struct {
 	{"B", 1},
 }
 
+// Parse reads one of these.
+//
+// It is here as well as [Bytes.UnmarshalText] because a consumer who is not
+// decoding a document has nothing to decode: `go doc ./size` used to render as
+// `type Bytes int64`, and the only way to turn "20GiB" into one was to declare
+// a variable and call a method on a pointer to it, which is not a thing anybody
+// guesses.
+func Parse(s string) (Bytes, error) {
+	var v Bytes
+	if err := v.UnmarshalText([]byte(s)); err != nil {
+		return 0, err
+	}
+
+	return v, nil
+}
+
+// UnmarshalText reads the form written in a configuration file. See [Parse].
 func (s *Bytes) UnmarshalText(b []byte) error {
 	v := strings.TrimSpace(string(b))
 	if v == "" {
@@ -102,6 +119,7 @@ func (s Bytes) MarshalText() ([]byte, error) {
 	return []byte(strconv.FormatInt(n, 10)), nil
 }
 
+// String is what [Bytes.MarshalText] wrote.
 func (s Bytes) String() string {
 	b, _ := s.MarshalText() //nolint:errcheck // it does not fail
 

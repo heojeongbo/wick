@@ -179,6 +179,7 @@ type Group struct {
 	spools []*Spool
 }
 
+// NewGroup holds several spools so that one call runs all of them.
 func NewGroup(spools ...*Spool) *Group {
 	return &Group{spools: spools}
 }

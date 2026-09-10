@@ -53,6 +53,8 @@ const (
 	Moves
 )
 
+// String is what this capability is called in a refusal, so that one names
+// the thing the source would have had to be able to do.
 func (c Capability) String() string {
 	switch c {
 	case Nothing:

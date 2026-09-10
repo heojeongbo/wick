@@ -56,11 +56,14 @@ type Stater interface {
 // pool, an open file. The engine closes what it made, and does not close what
 // it was handed.
 type Closer interface {
+	// Close lets go of it. The engine calls this on what it made and never on
+	// what it was handed.
 	Close() error
 }
 
 // A Spec is a sink's settings before they are a sink.
 type Spec interface {
+	// New makes the sink the spec describes.
 	New(ctx context.Context) (Sink, error)
 }
 
@@ -77,6 +80,7 @@ type Spec interface {
 // without this the one key every spec is guaranteed to be given would be the
 // first thing refused.
 type Typed struct {
+	// Type is the kind that chose this spec.
 	Type string `yaml:"type"`
 }
 

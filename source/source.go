@@ -59,6 +59,8 @@ type Source interface {
 // retention policy that would have deleted says so at startup instead of at the
 // first carry.
 type Remover interface {
+	// Remove deletes what key names. One that is not there is not an error:
+	// the thing that was wanted has happened.
 	Remove(ctx context.Context, key string) error
 }
 
@@ -84,6 +86,26 @@ type Watcher interface {
 	Watch(ctx context.Context) (<-chan struct{}, error)
 }
 
+// A Rooted is a Source that is somewhere on a filesystem, and can say where.
+//
+// It is what makes [github.com/heojeongbo/wick/trigger.FreeBelow] and
+// [github.com/heojeongbo/wick/retain.WhenFreeBelow] work: both of them are
+// about how much room is left where the files are, and the only way to measure
+// that is to know where that is.
+//
+// A source that is not one is not a failure. The room left reads as "nobody
+// could say", which those two treat as a reason to do nothing rather than as no
+// room -- a filesystem that cannot be measured must not look like one that is
+// full.
+//
+// It is separate from [Source] rather than part of it because a source held in
+// memory, or one reading from something that is not a filesystem at all, has no
+// honest answer to give.
+type Rooted interface {
+	// Root is the directory the source's keys are relative to.
+	Root() string
+}
+
 // A Spec is a source's settings before they are a source.
 //
 // It is the shape a configuration decodes into, so that `type: dir` in a file
@@ -98,6 +120,7 @@ type Spec interface {
 // is a field the spec knows about. See [github.com/heojeongbo/wick/sink.Typed]
 // for why that matters.
 type Typed struct {
+	// Type is the kind that chose this spec.
 	Type string `yaml:"type"`
 }
 

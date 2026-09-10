@@ -48,6 +48,8 @@ var stateNames = map[State]string{
 	Quarantined: "quarantined",
 }
 
+// String is the word this state is written as, in the journal and in
+// anything a person reads.
 func (s State) String() string {
 	if n, ok := stateNames[s]; ok {
 		return n
@@ -66,6 +68,7 @@ func (s State) MarshalText() ([]byte, error) {
 	return []byte(stateNames[s]), nil
 }
 
+// UnmarshalText reads one of those words back.
 func (s *State) UnmarshalText(b []byte) error {
 	for v, n := range stateNames {
 		if n == string(b) {
@@ -113,6 +116,7 @@ type Record struct {
 	// was configured with is in here.
 	Carried map[string]Carry `json:"carried,omitempty"`
 
+	// State is where in its life this record is. See [Pending].
 	State State `json:"state"`
 
 	// Attempts is how many times carrying it has been tried and failed. It is
@@ -162,13 +166,24 @@ type Journal interface {
 	// iteration; the caller sees it as the second value of the last pair.
 	Range(ctx context.Context, source string) iter.Seq2[Record, error]
 
+	// Close lets go of whatever is holding the records. What is written before
+	// it is written; there is nothing here that is only made durable by
+	// closing, because a journal that lost its last record on a hard reset
+	// would lose exactly the record the hard reset made important.
 	Close() error
 }
 
 // Sum is what a listing says about a source.
 type Sum struct {
-	Count  map[State]int
-	Bytes  map[State]int64
+	// Count is how many records are in each state, and Bytes is what they come
+	// to. Every state has an entry, including the ones that are zero, so that
+	// a reader does not have to tell "none" from "not counted".
+	Count map[State]int
+	Bytes map[State]int64
+
+	// Oldest is when the earliest thing still being remembered was last
+	// written, and is the zero time when nothing is. It is the number that
+	// says a spool has stopped keeping up rather than merely being busy.
 	Oldest time.Time
 }
 

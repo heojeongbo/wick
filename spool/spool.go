@@ -48,6 +48,7 @@ type Dest struct {
 	// fan-out is remembered by, so it has to be stable across restarts.
 	Name string
 
+	// Sink is where the bytes go.
 	Sink sink.Sink
 
 	// Naming is what an item is called here. Two destinations may name the
@@ -57,6 +58,14 @@ type Dest struct {
 
 	// Verify says to read the copy back before believing it arrived. It wants
 	// a [sink.Stater]; [New] refuses the pair if the sink is not one.
+	//
+	// It is false by default, and that is the opposite of what a configuration
+	// file gets: `verify:` left unwritten there means true. The two differ
+	// because a zero-valued Dest cannot demand a capability of a sink that has
+	// not been chosen yet, and a file can. So a spool built by hand carries
+	// without reading anything back unless it is asked to -- and reading it
+	// back is the only claim [github.com/heojeongbo/wick/sink] considers worth
+	// recording. Set it.
 	Verify bool
 }
 
@@ -104,9 +113,13 @@ type Config struct {
 	Now func() time.Time
 
 	// Free says how much room is left where the source is. Nothing means
-	// [disk.Free] of the source's root, when the source has one, and otherwise
-	// nothing -- which the triggers and policies read as "nobody could say"
-	// rather than as "no room".
+	// [disk.Free] of the source's root when the source is a [source.Rooted],
+	// and otherwise nothing -- which the triggers and policies read as "nobody
+	// could say" rather than as "no room".
+	//
+	// One supplied here answers the same way: (0, nil) for "cannot be
+	// measured". An error is treated the same, so there is no way to say "no
+	// room" by accident.
 	Free func() (uint64, error)
 }
 
@@ -178,6 +191,32 @@ type sighting struct {
 	at time.Time
 }
 
+// New makes a spool, and refuses one that could not work.
+//
+// Four things are required -- a Name, a Source, a Journal, and at least one
+// Dest with a name and a sink. Everything else in [Config] has a default that
+// is the safe answer rather than the convenient one: no trigger means it
+// carries only when asked, no retention means the original is kept, and no
+// clock means the real one.
+//
+// The refusals are all here rather than at the first carry, because the first
+// carry is at three in the morning on a machine nobody is watching. A
+// destination that is to be verified against a sink which cannot be asked what
+// it holds is the one worth naming: it would never record a carry, so it would
+// send the same file for ever.
+//
+//	s, err := spool.New(spool.Config{
+//		Name:    "recordings",
+//		Host:    "thor-top",
+//		Source:  src,
+//		Journal: jnl,
+//		Dests: []spool.Dest{
+//			{Name: "cloud", Sink: cloud, Naming: naming.MustParse("{host}/{name}"), Verify: true},
+//		},
+//		Trigger: trigger.Any(trigger.Every(15*time.Minute), trigger.FreeBelow(20<<30)),
+//		Retain:  retain.Grace(24*time.Hour, retain.Delete()),
+//		Settle:  10 * time.Second,
+//	})
 func New(c Config) (*Spool, error) {
 	if c.Name == "" {
 		return nil, fmt.Errorf("a spool has to have a name; it is what its records are kept under")
@@ -293,7 +332,7 @@ func (s *Spool) Name() string { return s.name }
 // A source that is not says nothing, and a trigger or a policy that asks reads
 // that as "nobody could say" rather than as "no room".
 func freeOf(src source.Source) func() (uint64, error) {
-	r, ok := src.(interface{ Root() string })
+	r, ok := src.(source.Rooted)
 	if !ok {
 		return func() (uint64, error) { return 0, nil }
 	}
