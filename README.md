@@ -217,6 +217,18 @@ There is a hundred per cent statement coverage gate, and the reason is in
 has run is a branch that will first run on a machine holding the only copy of
 something.
 
+## Trying it
+
+```sh
+$ cd examples/local && ./up.sh
+```
+
+An object store, a WebDAV server, something writing a file every five seconds,
+and wick carrying each one to three places at once — on your machine, with no
+account anywhere. [examples/](examples/) has the rest: configurations for the
+arrangements people actually run, and systemd units for putting it on a
+machine.
+
 ## Documents
 
 | | |
@@ -224,6 +236,7 @@ something.
 | [docs/SINKS.md](docs/SINKS.md) | every destination, every setting, and **what each one's read-back actually checks** |
 | [docs/DESIGN.md](docs/DESIGN.md) | the ordering everything rests on, and what is true after a crash at each point |
 | [docs/EXTENDING.md](docs/EXTENDING.md) | adding a kind, and releasing one |
+| [examples/](examples/) | a demo that runs locally, configurations that are tested, and systemd units |
 | [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md) | |
 
 ## What it does not do

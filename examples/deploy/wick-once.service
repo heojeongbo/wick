@@ -1,0 +1,36 @@
+# One pass, and then it exits. Driven by wick-once.timer.
+#
+# The other way to run this. A daemon is right when files appear at any hour and
+# the trigger should decide; a timer is right when the machine is only awake
+# sometimes, or when somebody else's scheduler already owns when things happen.
+#
+# `once` does not consult the trigger: whoever ran it has already decided that
+# now is the time. So the `trigger:` block in the configuration does nothing
+# here, and the timer below is the schedule.
+
+[Unit]
+Description=wick: carry what is due, once
+Documentation=https://github.com/heojeongbo/wick
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wick once --config /etc/wick/wick.yaml
+EnvironmentFile=-/etc/wick/env
+
+User=wick
+Group=wick
+
+StateDirectory=wick
+StateDirectoryMode=0700
+
+Nice=10
+IOSchedulingClass=idle
+
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/log/app/rec
+
+NoNewPrivileges=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

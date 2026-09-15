@@ -1,0 +1,23 @@
+# Every fifteen minutes, and once shortly after boot.
+#
+#     systemctl enable --now wick-once.timer
+#     systemctl list-timers wick-once.timer
+
+[Unit]
+Description=carry what is due, every quarter of an hour
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+# Without this every machine in a fleet carries at the same second, which turns
+# a shared uplink into a queue. A minute of jitter is nothing to a recording and
+# is the difference between a spike and a trickle.
+RandomizedDelaySec=60
+
+# A machine that was asleep at the appointed time carries when it wakes up
+# rather than waiting for the next one.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

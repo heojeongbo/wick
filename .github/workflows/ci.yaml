@@ -30,6 +30,10 @@ on:
       # Without this line a commit that changes only this file runs no CI at
       # all, so the guard would never run on the thing it guards.
       - wick.yaml
+      # And the same for every configuration under examples/, which are loaded
+      # and evaluated by the same test. The first thing it found was a key that
+      # is not a key.
+      - examples/**
   pull_request:
     branches:
       - main

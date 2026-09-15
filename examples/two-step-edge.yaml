@@ -1,0 +1,56 @@
+# Step one of two: the robot, which has no uplink of its own.
+#
+# It carries to a directory -- a mounted share, a drive somebody swaps -- and
+# stops there. The machine that does have an uplink runs two-step-uplink.yaml
+# against that same directory and takes it the rest of the way.
+#
+# Why this works: `sink/dir` writes to a temporary name and renames, so anything
+# watching that directory sees the whole file or no file, never half of one.
+# That is the property the second step rests on, and it is why this is an
+# arrangement rather than a hope.
+#
+# The two steps keep separate journals, which is what makes each of them safe on
+# its own. The robot deletes its recording once the share has it; the uplink
+# deletes the share's copy once the cloud has it. Neither one can delete
+# something the other still needs.
+
+identity:
+  name: thor-top
+
+journal:
+  path: /var/lib/wick/wick.db
+
+sinks:
+  collect:
+    type: dir
+    # An NFS or SMB mount, or a USB drive. It does not have to be there all the
+    # time: a carry to a directory that is not mounted fails, nothing is
+    # recorded, nothing is deleted, and the next pass tries again.
+    path: /mnt/collect
+
+spools:
+  - name: recordings
+    source:
+      type: dir
+      path: /var/log/app/rec
+      include: ["*.rec"]
+
+    carry:
+      settle_for: 10s
+
+    to:
+      - sink: collect
+        # The name has to carry which robot this was, because the second step
+        # sees only the directory and not who wrote into it.
+        name_as: "{host}/{name}"
+
+    trigger:
+      # Whenever something appears. The watcher nudges and this says yes, which
+      # is right when the destination is a local mount and carrying costs
+      # almost nothing.
+      count: 1
+
+    retain:
+      # No grace. The share is the copy now, and the disk on the robot is the
+      # thing that was running out.
+      after: delete

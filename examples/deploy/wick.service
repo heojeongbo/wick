@@ -1,0 +1,71 @@
+# The daemon. Install at /etc/systemd/system/wick.service.
+#
+#     systemctl enable --now wick
+#     journalctl -u wick -f
+#
+# See README.md in this directory for the credentials file and for what to do
+# about the ones that are not credentials.
+
+[Unit]
+Description=wick: draw what accumulates, and carry it away
+Documentation=https://github.com/heojeongbo/wick
+# The link is not required to start. wick is a daemon whose whole purpose is to
+# keep working across an outage, and one that refused to start without a network
+# would be one that does not come up on a machine that boots in a shed.
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/wick run --config /etc/wick/wick.yaml
+
+# Credentials by environment, not in the file. The file is world-readable often
+# enough to matter, and `wick config` prints what is in it -- as "(set)", but
+# that is a courtesy and not a boundary.
+#
+#     # /etc/wick/env, chmod 600, root only
+#     S3_KEY_ID=...
+#     S3_KEY_SECRET=...
+EnvironmentFile=-/etc/wick/env
+
+# The first signal means "finish what you are doing", and a carry most of the
+# way through half a gigabyte is worth finishing. Long enough for that on a slow
+# link; after it systemd sends the second, which wick takes as "now" and which
+# costs the bytes in flight and never a file.
+KillSignal=SIGTERM
+TimeoutStopSec=300
+
+Restart=always
+RestartSec=10s
+
+# Not root. It needs to read the recordings, write the journal, and reach the
+# network. Nothing else.
+User=wick
+Group=wick
+
+StateDirectory=wick
+StateDirectoryMode=0700
+
+# It carries large files over a shared link, and it is the least important thing
+# on the machine. Both of these say so.
+Nice=10
+IOSchedulingClass=idle
+
+# What it is allowed to touch. ReadWritePaths is the source -- it has to be
+# writable because a retention that deletes or moves has to be able to.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/log/app/rec
+
+NoNewPrivileges=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+
+[Install]
+WantedBy=multi-user.target

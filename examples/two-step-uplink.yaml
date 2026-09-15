@@ -1,0 +1,65 @@
+# Step two of two: the machine with the uplink.
+#
+# It watches the directory the robots carried into -- see two-step-edge.yaml --
+# and takes it to the cloud. One connection to the internet instead of one per
+# robot, one set of credentials instead of one per robot, and the robots
+# themselves never hold a cloud key.
+#
+# `include` is what makes this a different spool from the one that wrote here:
+# the first step renames into place, so a name matching "*.rec" in this
+# directory is a whole file.
+
+identity:
+  # This machine, not the robot. The names the robots chose already say which
+  # robot; {key} below is what keeps them.
+  name: uplink
+
+journal:
+  path: /var/lib/wick/wick.db
+
+health:
+  endpoint: 0.0.0.0:9090
+
+sinks:
+  cloud:
+    type: s3
+    bucket: recordings
+    access_key_id: "${env:S3_KEY_ID}"
+    secret_access_key: "${env:S3_KEY_SECRET}"
+    part_size: 32MiB
+    concurrency: 4
+
+spools:
+  - name: collected
+    source:
+      type: dir
+      path: /mnt/collect
+      include: ["*.rec"]
+
+    carry:
+      # Nothing here is half-written: the first step renamed it into place. Set
+      # anyway and small, because a drive somebody plugs in mid-copy is the one
+      # case that does not hold.
+      settle_for: 5s
+      workers: 4
+
+    to:
+      - sink: cloud
+        # {key} and not {name}: the key is the whole relative path, so
+        # "thor-top/session-41.rec" keeps the directory the robot's name made.
+        # {name} would flatten every robot into one prefix and lose which was
+        # which.
+        name_as: "{yyyy}/{mm}/{dd}/{key}"
+
+    trigger:
+      # This machine is not the one running out of disk, so there is no
+      # free_below here. It carries on the clock, or when enough has piled up
+      # to be worth a connection.
+      every: 5m
+      bytes: 1GiB
+
+    retain:
+      after: delete
+      # A week. The share is cheap and it is the last copy before the cloud;
+      # somebody who finds a problem on Friday can still look at Monday's.
+      grace: 168h

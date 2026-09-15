@@ -1,0 +1,78 @@
+# A robot with recordings, and a bucket.
+#
+# The plainest arrangement there is, and the one to start from. One place
+# watched, one place to send it, delete the original a day after it has arrived.
+#
+#     wick check     # would this work on this machine
+#     wick run       # then leave it running
+
+identity:
+  # Three computers in one robot write the same kind of file. Without this they
+  # all write into the same bucket under the same names and the last one wins.
+  # Left unsaid it is the hostname, which is usually right and is worth being
+  # explicit about on a machine that was imaged from another.
+  name: thor-top
+
+journal:
+  # What has already been carried. It has to survive a restart, or everything
+  # is sent again every time the daemon comes up.
+  path: /var/lib/wick/wick.db
+
+health:
+  # /healthz says the process is alive; /readyz says it can reach its journal.
+  # Liveness deliberately stays up while the link is down -- see docs/DESIGN.md.
+  endpoint: 127.0.0.1:9090
+
+sinks:
+  cloud:
+    type: s3
+    bucket: recordings
+    # Nothing else: on AWS with an instance role this is the whole of it, and
+    # an instance role is much the better way round. A long-lived key on a
+    # machine in a cupboard is a long-lived key on a machine somebody can walk
+    # up to.
+    #
+    # If this machine has no role, uncomment these and set the variables in the
+    # unit file rather than writing the key here:
+    #
+    #   access_key_id: "${env:S3_KEY_ID}"
+    #   secret_access_key: "${env:S3_KEY_SECRET}"
+
+    # Bytes a second. Left out there is no limit, and on a shared uplink that
+    # means the upload takes the link away from whatever the robot is for.
+    rate_limit: 20MiB
+
+spools:
+  - name: recordings
+    source:
+      type: dir
+      path: /var/log/app/rec
+      include: ["*.rec"]
+
+    carry:
+      # A file still being written looks exactly like one that has been
+      # written. Ten seconds is generous for a recorder that renames into
+      # place and about right for one that does not.
+      settle_for: 10s
+
+    to:
+      - sink: cloud
+        # {host} is what keeps the three computers apart. The date parts come
+        # from the file's own time in UTC, so the same file gets the same name
+        # whatever the machine's clock is set to -- which on an appliance that
+        # boots without a network is often nothing at all.
+        name_as: "{host}/{yyyy}/{mm}/{dd}/{name}"
+
+    trigger:
+      # A quarter of an hour, or sooner if the disk is getting tight. The
+      # second one is not about carrying on time; it is about the disk filling
+      # being what stops the robot doing the thing it is for.
+      every: 15m
+      free_below: 20GiB
+
+    retain:
+      # Deleted a day after it arrived, not a day after it was written. The
+      # grace is there so that somebody who notices a problem in the morning
+      # still has the local copy.
+      after: delete
+      grace: 24h

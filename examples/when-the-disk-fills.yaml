@@ -1,0 +1,51 @@
+# Carry nothing until the disk is getting tight, and then carry.
+#
+# For a machine on a link that is metered, or one where the recordings are
+# usually looked at locally and only sometimes need to leave. Nothing goes over
+# the wire on an ordinary day.
+#
+# The thing to understand before using this: a filesystem that cannot be
+# measured reads as "nobody could say" and not as "no room", so a source whose
+# free space cannot be read carries nothing rather than everything. That is the
+# safe way round, and it means this arrangement quietly does nothing if the
+# source is not somewhere with a filesystem under it. `wick status` is how you
+# would notice -- a pending count that only grows.
+
+identity:
+  name: thor-top
+
+journal:
+  path: /var/lib/wick/wick.db
+
+sinks:
+  cloud:
+    type: s3
+    bucket: recordings
+    rate_limit: 5MiB
+
+spools:
+  - name: recordings
+    source:
+      type: dir
+      path: /var/log/app/rec
+      include: ["*.rec"]
+
+    carry:
+      settle_for: 30s
+
+    to:
+      - sink: cloud
+        name_as: "{host}/{yyyy}/{mm}/{dd}/{name}"
+
+    trigger:
+      # The only one. No `every`, so a machine with room left carries nothing,
+      # for ever, and that is what was asked for.
+      free_below: 50GiB
+
+    retain:
+      # Also only when the disk is tight, and with a different threshold from
+      # the trigger. Carrying starts at 50G and deleting starts at 20G, so
+      # there is a window where everything has been carried and the local copy
+      # is still there to look at.
+      after: delete
+      free_below: 20GiB

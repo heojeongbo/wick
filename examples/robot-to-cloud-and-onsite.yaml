@@ -1,0 +1,80 @@
+# The cloud and the server in the building, at the same time.
+#
+# This is one spool with two destinations and not two spools. The difference is
+# the whole point: a file is recorded as carried only when *both* have confirmed
+# it, so the original is never deleted on the strength of half an answer. Two
+# spools would each keep their own records and each delete on their own.
+#
+# A restart in the middle of a fan-out does not send again to the one that
+# already had it. On a metered uplink that is the difference between a retry and
+# a bill.
+
+identity:
+  name: thor-top
+
+journal:
+  path: /var/lib/wick/wick.db
+
+sinks:
+  cloud:
+    type: s3
+    bucket: recordings
+    access_key_id: "${env:S3_KEY_ID}"
+    secret_access_key: "${env:S3_KEY_SECRET}"
+    rate_limit: 10MiB
+
+  onsite:
+    type: sftp
+    address: files.example.com:22
+    user: wick
+    path: /srv/recordings
+
+    # One of the two, not both.
+    key_file: /var/lib/wick/id_ed25519
+    # password: "${env:SFTP_PASSWORD}"
+
+    # Required, and there is no flag turning it off by accident. A host key
+    # nobody checks is a sink that will one day be somebody else, and these are
+    # the files nobody is watching.
+    #
+    # Make it once, while somebody is looking:
+    #
+    #     ssh-keyscan files.example.com > /etc/wick/known_hosts
+    #
+    # and then `wick check`, which reads it and reaches the server. That is the
+    # part people get wrong, and the only way to find out otherwise is a carry
+    # that fails at three in the morning.
+    known_hosts: /etc/wick/known_hosts
+
+    # No limit: this one is on the local network and the point of having it is
+    # that it is fast.
+
+spools:
+  - name: recordings
+    source:
+      type: dir
+      path: /var/log/app/rec
+      include: ["*.rec"]
+
+    carry:
+      settle_for: 10s
+      # Two at a time. More than that and the two destinations start competing
+      # for the same uplink, which makes both of them slower.
+      workers: 2
+
+    to:
+      - sink: cloud
+        name_as: "{host}/{yyyy}/{mm}/{dd}/{name}"
+      # A different name at each end, which is what per-destination naming is
+      # for: the bucket wants a prefix and a date, the server in the building
+      # already has a directory per robot.
+      - sink: onsite
+        name_as: "{host}/{name}"
+
+    trigger:
+      every: 15m
+      free_below: 20GiB
+
+    retain:
+      after: delete
+      grace: 24h
