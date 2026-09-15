@@ -56,6 +56,12 @@ type API interface {
 	manager.UploadAPIClient
 
 	HeadObject(ctx context.Context, in *awss3.HeadObjectInput, opts ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error)
+
+	// HeadBucket is asked about the bucket rather than about anything in it,
+	// and is how [Sink.Reach] tells a store that is not there from one that
+	// simply does not hold a name. HeadObject cannot: S3 answers a HEAD with
+	// no body, so both arrive as a bare 404.
+	HeadBucket(ctx context.Context, in *awss3.HeadBucketInput, opts ...func(*awss3.Options)) (*awss3.HeadBucketOutput, error)
 }
 
 const (
@@ -362,6 +368,24 @@ func (s *Sink) Stat(ctx context.Context, name string) (sink.Meta, error) {
 	return m, nil
 }
 
+// Reach asks about the bucket, and writes nothing.
+//
+// It is what `wick check` uses. A bucket that is not there, a key that is not
+// allowed to see it, an endpoint nothing answers on: all three come back here
+// as themselves rather than as the flat "not found" that asking about an object
+// would give.
+func (s *Sink) Reach(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if _, err := s.api.HeadBucket(ctx, &awss3.HeadBucketInput{Bucket: aws.String(s.bucket)}); err != nil {
+		return z.Err(err, "reach the bucket %q", s.bucket)
+	}
+
+	return nil
+}
+
 func (s *Sink) key(name string) string {
 	if s.prefix == "" {
 		return name
@@ -374,6 +398,26 @@ func (s *Sink) key(name string) string {
 // typed one is what a well-behaved SDK gives; the status is what a compatible
 // store that has its own opinions gives.
 func isNotFound(err error) bool {
+	// A bucket that is not there is answered with a 404 as well, and it is the
+	// opposite kind of news. "I do not hold that name" means the store was
+	// reached and the credentials were taken; "there is no such bucket" means
+	// nothing was. Reading the second as the first makes a store nobody can
+	// write to look like an empty one -- `wick check` calls it reached, and a
+	// carry writes, fails, and is retried for ever against a bucket that will
+	// never exist.
+	var nb *types.NoSuchBucket
+	if errors.As(err, &nb) {
+		return false
+	}
+
+	// The same thing, from a store that is compatible rather than AWS. MinIO
+	// answers HeadObject on a missing bucket with this and a 404, which the
+	// status check below would otherwise swallow.
+	var coded smithy.APIError
+	if errors.As(err, &coded) && coded.ErrorCode() == "NoSuchBucket" {
+		return false
+	}
+
 	var nk *types.NoSuchKey
 	if errors.As(err, &nk) {
 		return true
@@ -416,6 +460,7 @@ func decodeSHA256(digest string) ([]byte, bool) {
 }
 
 var (
-	_ sink.Sink   = (*Sink)(nil)
-	_ sink.Stater = (*Sink)(nil)
+	_ sink.Sink    = (*Sink)(nil)
+	_ sink.Stater  = (*Sink)(nil)
+	_ sink.Reacher = (*Sink)(nil)
 )

@@ -69,8 +69,15 @@ func TestOpen(t *testing.T) {
 		// Two of this daemon on one journal is an operator error, and it is
 		// much better as a refusal at startup than as two processes deleting
 		// the same files.
+		//
+		// What it says matters as much as that it refuses. bbolt's own word
+		// for this is "timeout", which somebody running `wick status` while
+		// the daemon is up would read as "try again" -- and it was never going
+		// to work while the other one is running.
 		_, err = bolt.Open(p)
-		x.ErrorContains(err, "open journal")
+		x.ErrorContains(err, "held by something else")
+		x.ErrorContains(err, "wick run")
+		x.ErrorContains(err, p)
 	})
 }
 

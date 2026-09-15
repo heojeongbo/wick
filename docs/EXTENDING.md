@@ -18,13 +18,23 @@ does; one that cannot ignores them.
 Three more are optional, and the engine asks whether you have them:
 
 ```go
-type Stater interface{ Stat(ctx, name) (Meta, error) }   // the read-back
-type Closer interface{ Close() error }                    // a connection to let go of
+type Stater  interface{ Stat(ctx, name) (Meta, error) }  // the read-back
+type Closer  interface{ Close() error }                  // a connection to let go of
+type Reacher interface{ Reach(ctx) error }               // "is the place itself there"
 ```
 
 Without `Stater` there is nothing to confirm a carry with, and a spool
 configured `verify: true` against you is refused at startup rather than at the
 first carry.
+
+`Reacher` is only for `wick check`, and only worth having when asking about a
+name would answer the wrong question. `Stat` on a name nothing is called is
+normally a complete probe -- "I do not hold that" could only be said by a store
+that was reached and credentials that were taken. It is not enough for S3,
+which answers a HEAD with no body: a bucket that does not exist and a key that
+does not exist arrive as the same bare 404, and the first is the one somebody
+wants to hear about before the daemon starts. `sink/s3` implements it with
+HeadBucket; everything else falls back to the `Stat`.
 
 ## Two things the engine relies on
 

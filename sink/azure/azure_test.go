@@ -263,6 +263,28 @@ func TestStat(t *testing.T) {
 		x.ErrorIs(err, errRefused)
 		x.NotErrorIs(err, fs.ErrNotExist)
 	})
+
+	// A container that is not there answers with a 404 as well, and means the
+	// opposite thing. "I do not hold that blob" says the store was reached and
+	// the credentials were taken; "there is no such container" says nothing
+	// was. This used to be folded in with BlobNotFound, which made a container
+	// nobody can write to look like an empty one -- `wick check` called it
+	// reached.
+	t.Run("a container that is not there is not a blob that is not there", func(t *testing.T) {
+		x := require.New(t)
+
+		f := newFake()
+		f.propsErr = map[string]error{"a.rec": &azcore.ResponseError{
+			ErrorCode:  string(bloberror.ContainerNotFound),
+			StatusCode: http.StatusNotFound,
+		}}
+		s := onFake(t, f, wickazure.Options{})
+
+		_, err := s.Stat(t.Context(), "a.rec")
+		x.Error(err)
+		x.NotErrorIs(err, fs.ErrNotExist)
+		x.ErrorContains(err, string(bloberror.ContainerNotFound))
+	})
 }
 
 func TestSpec(t *testing.T) {

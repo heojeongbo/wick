@@ -1,0 +1,91 @@
+# The configuration the demo runs on.
+#
+# Three destinations, and a file is only carried once every one of them has
+# confirmed it. That is the arrangement this whole thing is for: the cloud and
+# the disk next door are one spool with several sinks, not several spools that
+# each half-know about the file.
+#
+# There is no sftp sink here, and that is a decision about the demo rather than
+# about wick: the SSH server images this would depend on are the least
+# predictable part of it, and a demo that does not come up the first time is
+# worth nothing. ../robot-to-cloud-and-onsite.yaml is how one is written, and
+# `wick check` is how it is tested -- it reads the known_hosts and reaches the
+# server, which is the part worth getting wrong in front of somebody.
+
+identity:
+  # What this machine is called in the name an object is given. Left unsaid it
+  # is the hostname, which in a container is a hex string nobody can read.
+  name: thor-top
+
+journal:
+  # On a volume, so that a restart does not carry everything again.
+  path: /var/lib/wick/wick.db
+
+health:
+  # /healthz and /readyz. Liveness stays up while the link is down, because
+  # the link being down is the case this exists for.
+  endpoint: 0.0.0.0:9000
+
+sinks:
+  # An object store reached by address rather than by name, which is what
+  # path_style is for. MinIO here; the same block with the endpoint removed is
+  # S3 itself.
+  cloud:
+    type: s3
+    bucket: recordings
+    endpoint: http://minio:9000
+    region: us-east-1
+    path_style: true
+    access_key_id: "${env:S3_KEY_ID}"
+    secret_access_key: "${env:S3_KEY_SECRET}"
+
+  # A NAS front end. The collections a name needs are made before the PUT,
+  # because a WebDAV server will not accept one into a collection that is not
+  # there.
+  nas:
+    type: webdav
+    endpoint: http://webdav/
+    username: wick
+    password: "${env:WEBDAV_PASSWORD}"
+
+  # A disk next door. The write is atomic -- a temporary name and a rename --
+  # which is what makes a two-step arrangement work: another wick can watch
+  # this directory and carry onward. See ../two-step-edge.yaml.
+  nearby:
+    type: dir
+    path: /nearby
+
+spools:
+  - name: recordings
+    source:
+      type: dir
+      path: /recordings
+      include: ["*.rec"]
+
+    carry:
+      # A file that is still being written looks exactly like one that has been
+      # written. The recorder here renames into place so this is not strictly
+      # needed; it is set because on a real machine something eventually does
+      # not, and the cost of being wrong the other way is a truncated upload.
+      settle_for: 2s
+
+    to:
+      - sink: cloud
+        name_as: "{host}/{yyyy}/{mm}/{dd}/{name}"
+      - sink: nas
+        name_as: "{yyyy}-{mm}-{dd}/{name}"
+      - sink: nearby
+        name_as: "{name}"
+
+    trigger:
+      # Two things waiting, or thirty seconds, whichever comes first. Small
+      # numbers so that the demo does something while you are looking at it; on
+      # a robot these are minutes and gigabytes.
+      every: 30s
+      count: 2
+      free_below: 1GiB
+
+    retain:
+      # Only after all three have confirmed it. Nothing is deleted on the
+      # strength of a write that was not read back.
+      after: delete

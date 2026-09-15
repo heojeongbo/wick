@@ -50,6 +50,7 @@ type fakeAPI struct {
 	partErr     error
 	completeErr error
 	headErr     error
+	bucketErr   error
 }
 
 func newAPI() *fakeAPI {
@@ -163,6 +164,14 @@ func (f *fakeAPI) HeadObject(ctx context.Context, in *awss3.HeadObjectInput, _ .
 	}
 
 	return out, nil
+}
+
+func (f *fakeAPI) HeadBucket(context.Context, *awss3.HeadBucketInput, ...func(*awss3.Options)) (*awss3.HeadBucketOutput, error) {
+	if f.bucketErr != nil {
+		return nil, f.bucketErr
+	}
+
+	return &awss3.HeadBucketOutput{}, nil
 }
 
 func partNumbers(m map[int32][]byte) func(func(int32) bool) {
@@ -386,6 +395,15 @@ func TestStatTellsNotThereFromCannotSay(t *testing.T) {
 		{"a status from a store with its own opinions", &smithyhttp.ResponseError{Response: &smithyhttp.Response{Response: statusResponse(404)}}, true},
 		{"a code from one with even more of them", &smithy.GenericAPIError{Code: "NoSuchKey"}, true},
 		{"anything else at all", errRefused, false},
+
+		// A bucket that is not there answers with a 404 as well, and means the
+		// opposite: not "I do not hold that name" -- which says the store was
+		// reached and the credentials were taken -- but "there is no store".
+		// Told apart, because `wick check` calls the first one reached, and a
+		// carry to the second would be retried for ever against a bucket that
+		// is never going to exist.
+		{"no such bucket, typed", &types.NoSuchBucket{}, false},
+		{"no such bucket, from a compatible store", &smithy.GenericAPIError{Code: "NoSuchBucket"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			x := require.New(t)
@@ -604,4 +622,52 @@ func TestSayingWhoThisIs(t *testing.T) {
 			x.ErrorContains(err, tc.says)
 		})
 	}
+}
+
+// The one `wick check` is for.
+//
+// Asking about a name cannot answer it: S3 replies to a HEAD with no body, so a
+// bucket that is not there and a key that is not there arrive as the same bare
+// 404 -- and this sink would have called the first of those "not holding that
+// name", which is what a store that was reached and is simply empty says.
+func TestReach(t *testing.T) {
+	t.Run("a bucket that is there", func(t *testing.T) {
+		x := require.New(t)
+
+		s := newSink(t, newAPI(), s3.Options{})
+		x.NoError(s.Reach(t.Context()))
+	})
+
+	t.Run("a bucket that is not", func(t *testing.T) {
+		x := require.New(t)
+
+		api := newAPI()
+		api.bucketErr = &types.NoSuchBucket{}
+		s := newSink(t, api, s3.Options{})
+
+		err := s.Reach(t.Context())
+		x.Error(err)
+		x.ErrorContains(err, "reach the bucket")
+		x.NotErrorIs(err, fs.ErrNotExist, "a store that is not there read as one that is empty")
+	})
+
+	t.Run("one that will not say", func(t *testing.T) {
+		x := require.New(t)
+
+		api := newAPI()
+		api.bucketErr = errRefused
+		s := newSink(t, api, s3.Options{})
+
+		x.ErrorIs(s.Reach(t.Context()), errRefused)
+	})
+
+	t.Run("a context that is already done", func(t *testing.T) {
+		x := require.New(t)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		s := newSink(t, newAPI(), s3.Options{})
+		x.ErrorIs(s.Reach(ctx), context.Canceled)
+	})
 }

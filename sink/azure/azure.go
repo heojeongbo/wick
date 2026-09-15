@@ -265,9 +265,16 @@ func (s *Sink) Stat(ctx context.Context, name string) (sink.Meta, error) {
 
 	p, err := s.api.Properties(ctx, key)
 	if err != nil {
-		if bloberror.HasCode(err, bloberror.BlobNotFound, bloberror.ContainerNotFound) {
-			// Not there is told from cannot-say, so that the engine sends it
-			// again rather than reading the answer as a reason to give up.
+		// BlobNotFound and nothing else. Not there is told from cannot-say, so
+		// that the engine sends it again rather than reading the answer as a
+		// reason to give up.
+		//
+		// ContainerNotFound used to be in here and is the opposite kind of
+		// news: "I do not hold that name" means the store was reached and the
+		// credentials were taken, and "there is no such container" means
+		// nothing was. Reading the second as the first makes a container
+		// nobody can write to look like an empty one.
+		if bloberror.HasCode(err, bloberror.BlobNotFound) {
 			return sink.Meta{}, &fs.PathError{Op: "stat", Path: name, Err: fs.ErrNotExist}
 		}
 

@@ -70,12 +70,11 @@ func (w *Wick) Reach(ctx context.Context) ([]string, error) {
 		reached []string
 	)
 	for _, name := range names {
-		s, ok := w.Sinks[name].(sink.Stater)
-		if !ok {
+		err, asked := ask(ctx, w.Sinks[name], probe)
+		if !asked {
 			continue
 		}
-
-		if _, err := s.Stat(ctx, probe); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err != nil {
 			errs = append(errs, z.Err(err, "the sink %q", name))
 
 			continue
@@ -85,6 +84,34 @@ func (w *Wick) Reach(ctx context.Context) ([]string, error) {
 	}
 
 	return reached, errors.Join(errs...)
+}
+
+// ask puts the question to one sink, whichever way it can answer, and says
+// whether it could be asked at all.
+//
+// [sink.Reacher] first, because a sink that has one has it precisely where
+// asking about a name is not good enough: S3 answers a HEAD with no body, so a
+// bucket that does not exist and a key that does not exist arrive as the same
+// bare 404, and the first of those is the one worth hearing about.
+//
+// [sink.Stater] otherwise, where "I do not hold that" is a complete answer --
+// it could only be given by a store that was reached and credentials that were
+// taken.
+func ask(ctx context.Context, s sink.Sink, probe string) (error, bool) {
+	if r, ok := s.(sink.Reacher); ok {
+		return r.Reach(ctx), true
+	}
+
+	st, ok := s.(sink.Stater)
+	if !ok {
+		return nil, false
+	}
+
+	if _, err := st.Stat(ctx, probe); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err, true
+	}
+
+	return nil, true
 }
 
 // Close lets go of everything this opened, and of nothing it was handed.

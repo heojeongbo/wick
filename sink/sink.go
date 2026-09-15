@@ -61,6 +61,26 @@ type Closer interface {
 	Close() error
 }
 
+// A Reacher is a Sink that can be asked whether the place itself is there, as
+// opposed to whether it holds some name.
+//
+// [Stater] nearly answers this and cannot quite. Asking an object store about a
+// name it does not hold proves the store was reached and the credentials were
+// taken, which is most of what is wanted -- but S3 answers HEAD with no body,
+// so a bucket that does not exist and a key that does not exist arrive as the
+// same bare 404. The one failure somebody most wants to hear about before the
+// daemon starts is the one that cannot be seen that way.
+//
+// So a sink that has a cheaper or more exact question implements this and is
+// asked it instead. `wick check` is the caller. Carrying never uses it: a sink
+// that is missing at the moment of a carry fails the carry, which is already
+// the right outcome.
+type Reacher interface {
+	// Reach answers nil when the destination is there and can be written to,
+	// and says what is wrong when it is not. It writes nothing.
+	Reach(ctx context.Context) error
+}
+
 // A Spec is a sink's settings before they are a sink.
 type Spec interface {
 	// New makes the sink the spec describes.

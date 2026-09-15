@@ -20,6 +20,8 @@ package bolt
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"iter"
 	"os"
 	"path/filepath"
@@ -59,6 +61,15 @@ func Open(path string) (*Journal, error) {
 
 	db, err := bbolt.Open(path, 0o600, &bbolt.Options{Timeout: openTimeout})
 	if err != nil {
+		if errors.Is(err, bbolt.ErrTimeout) {
+			// One writer at a time, and bbolt says only "timeout" about it.
+			// Somebody running `wick status` against a machine where the
+			// daemon is up gets that word and nothing else, and the thing they
+			// need to know is not that it took too long but that it was never
+			// going to work while the other one is running.
+			return nil, fmt.Errorf("the journal %q is held by something else, most likely a `wick run` already going: only one thing at a time may have it open", path)
+		}
+
 		return nil, z.Err(err, "open journal %q", path)
 	}
 

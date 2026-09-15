@@ -1,0 +1,128 @@
+# The whole thing, on one machine, with no account anywhere.
+#
+# A recorder writing a file every few seconds, three places for those files to
+# go, and wick carrying to all three at once -- so that nothing is deleted until
+# every one of them has confirmed it. That is the arrangement the README
+# describes, small enough to watch:
+#
+#     ./up.sh
+#
+# What to look at while it runs is in README.md.
+
+name: wick-demo
+
+services:
+  # An object store that speaks S3. Reached by address rather than by name,
+  # which is what `path_style: true` in the configuration is for.
+  minio:
+    image: quay.io/minio/minio:latest
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: demo
+      MINIO_ROOT_PASSWORD: demo-secret
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Buckets are not made by writing to them. This is the one part of setting a
+  # store up that wick does not do and should not: somewhere to put things is a
+  # decision about the account, not about the carry.
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio: {condition: service_healthy}
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mc alias set demo http://minio:9000 demo demo-secret
+        mc mb --ignore-existing demo/recordings
+        echo "bucket ready"
+
+  # A NAS front end.
+  webdav:
+    image: bytemark/webdav:2.4
+    environment:
+      AUTH_TYPE: Basic
+      USERNAME: wick
+      PASSWORD: demo-secret
+
+  # Named volumes are made owned by root, and the image below runs as 65532
+  # because a daemon that carries files does not need to be root to do it. This
+  # is the one step that does, and it is over in a second.
+  prepare:
+    image: alpine:3
+    user: "0:0"
+    volumes:
+      - recordings:/recordings
+      - journal:/var/lib/wick
+      - nearby:/nearby
+    entrypoint:
+      - sh
+      - -c
+      - |
+        chown -R 65532:65532 /recordings /var/lib/wick /nearby
+        echo "volumes are the daemon's to write to"
+
+  # The machine that produces the files: one every five seconds, a quarter of a
+  # megabyte each.
+  #
+  # Written under a temporary name and renamed, which is what a well-behaved
+  # writer does. `settle_for` in the configuration is there for when something
+  # does not -- a file still being appended to looks exactly like one that is
+  # finished.
+  recorder:
+    image: alpine:3
+    user: "65532:65532"
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+    volumes:
+      - recordings:/recordings
+    entrypoint:
+      - sh
+      - -c
+      - |
+        n=0
+        while true; do
+          n=$$((n + 1))
+          f=$$(printf "session-%03d.rec" $$n)
+          head -c 262144 /dev/urandom > "/recordings/.$$f"
+          mv "/recordings/.$$f" "/recordings/$$f"
+          echo "recorded $$f"
+          sleep 5
+        done
+
+  wick:
+    image: ghcr.io/heojeongbo/wick:local
+    command: [run, --verbose]
+    depends_on:
+      prepare: {condition: service_completed_successfully}
+      minio-init: {condition: service_completed_successfully}
+      webdav: {condition: service_started}
+    environment:
+      # Named here and not written in the file. `wick config` prints them as
+      # "(set)"; try it and see.
+      S3_KEY_ID: demo
+      S3_KEY_SECRET: demo-secret
+      WEBDAV_PASSWORD: demo-secret
+    volumes:
+      - ./wick.yaml:/wick.yaml:ro
+      # Read-write: the retention in this demo deletes what it has carried.
+      - recordings:/recordings
+      # The records. Without this surviving a restart, everything is carried
+      # again every time the daemon comes up.
+      - journal:/var/lib/wick
+      - nearby:/nearby
+    ports:
+      # /healthz and /readyz, so that the README can show what a probe sees.
+      - "127.0.0.1:9000:9000"
+    # uid and gid both, because a scratch image has no /etc/passwd and a
+    # supplementary group never resolves.
+    user: "65532:65532"
+
+volumes:
+  recordings:
+  journal:
+  nearby:

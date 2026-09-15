@@ -45,7 +45,16 @@ reached and the credentials were taken.
 Most of these are built without touching the network on purpose, so a bucket
 that is not there, a role that is not allowed, and an `sftp` `known_hosts` that
 is missing all look perfectly fine until the first carry. This is the command
-that finds them at a time somebody is looking.
+that finds them at a time somebody is looking:
+
+```
+$ wick check
+error: the sink "cloud": reach the bucket "recordings": ... StatusCode: 403 ... Forbidden
+```
+
+`s3` is asked about the bucket rather than about a name in it, because S3
+answers a HEAD with no body and a missing bucket would otherwise be
+indistinguishable from a missing key.
 
 Secrets written below are printed as `(set)` by `wick config`. `--reveal` gives
 back the form that can be loaded again.

@@ -80,3 +80,45 @@ func TestReach(t *testing.T) {
 		x.Empty(reached)
 	})
 }
+
+// reaching is a sink that can be asked about itself rather than about a name,
+// which is what an object store needs: S3 answers a HEAD with no body, so a
+// bucket that is not there and a key that is not there are the same bare 404.
+type reaching struct {
+	refusing
+
+	err error
+}
+
+func (r reaching) Reach(context.Context) error { return r.err }
+
+func TestReachPrefersAskingAboutThePlace(t *testing.T) {
+	t.Run("one that says it is there", func(t *testing.T) {
+		x := require.New(t)
+
+		// Its Stat would say "not there", which the other path reads as a
+		// complete answer. Reach is what is asked instead.
+		w := &config.Wick{Sinks: map[string]sink.Sink{
+			"cloud": reaching{refusing: refusing{err: fs.ErrNotExist}},
+		}}
+
+		reached, err := w.Reach(t.Context())
+		x.NoError(err)
+		x.Equal([]string{"cloud"}, reached)
+	})
+
+	t.Run("one that says it is not", func(t *testing.T) {
+		x := require.New(t)
+
+		// And here the Stat would have said "not there" too -- which is
+		// exactly the confusion this exists to end.
+		w := &config.Wick{Sinks: map[string]sink.Sink{
+			"cloud": reaching{refusing: refusing{err: fs.ErrNotExist}, err: errRefused},
+		}}
+
+		reached, err := w.Reach(t.Context())
+		x.ErrorIs(err, errRefused)
+		x.ErrorContains(err, `the sink "cloud"`)
+		x.Empty(reached)
+	})
+}
