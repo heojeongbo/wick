@@ -39,6 +39,20 @@ consumer reads on pkg.go.dev, and what a contributor sees when the gate fails.
   profiles the gate writes showed up as untracked after every run.
 - `wick.yaml` was not in the CI path filter, so the test written to guard it
   never ran on a commit that changed it.
+- **`wick check` said a bucket that does not exist was reached.** The `s3` sink
+  read any 404 as "I do not hold that name", which swallowed `NoSuchBucket`;
+  `azure` had `ContainerNotFound` folded in beside `BlobNotFound` the same way.
+  Those are the opposite kind of news — not holding a name says the store was
+  reached and the credentials were taken, and there being no store says nothing
+  was. S3 answers a HEAD with no body, so telling them apart also needed
+  `sink.Reacher`. Measured against MinIO: a missing bucket is now a 404 and
+  wrong credentials a 403, each named.
+- `.dockerignore` excluded `.github/` and `docs/`, so the check that every list
+  of modules agrees could not read either inside the image — and CI's only run
+  of the gate is that image.
+- `wick status` against a machine where the daemon is up said `timeout` and
+  nothing else, which reads as "try again" when it was never going to work. It
+  now says what holds the journal.
 
 **Changed**
 
@@ -65,12 +79,22 @@ consumer reads on pkg.go.dev, and what a contributor sees when the gate fails.
   nothing, and leaves no journal behind if there was none.
 - `wick completion zsh`.
 - `wick status --json`.
-- Runnable examples for `spool`, `trigger`, `retain`, `naming`, `sink`, `size`
-  and `sinktest`, where there were none in any package.
+- **`examples/`** — a demo that runs on one machine with no account anywhere
+  (`cd examples/local && ./up.sh`: an object store, a WebDAV server, something
+  writing files, and wick carrying each to three places at once), five
+  configurations written for situations rather than for features, and systemd
+  units for both ways of running it. Every configuration is loaded and
+  evaluated by the gate; all three units verify clean under
+  `systemd-analyze verify`.
+- Runnable examples across sixteen packages, where there were none in any one of
+  them. They are compiled and run by `go test`, so unlike a block in a README
+  they cannot quietly stop being true.
 - `source.Rooted`, which names the interface that decides whether
   `trigger.FreeBelow` and `retain.WhenFreeBelow` can work at all. It was an
   undeclared type assertion in `spool`.
 - `size.Parse`, `config.Wick.Sinks` and `config.Wick.Reach`.
+- `sink.Reacher` — an optional "is the place itself there", which `wick check`
+  prefers where a sink has one. `sink/s3` implements it with HeadBucket.
 - A gate check that every list of modules in the repository agrees with
   `go.work` — the two that used to fail silently are the two that caused v0.2.1.
 
