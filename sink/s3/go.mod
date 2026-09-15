@@ -35,3 +35,13 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/time v0.16.0 // indirect
 )
+
+// Until the release that names sink.Reacher.
+//
+// This module implements an interface that lives in the root, and the root's
+// last tag does not have it yet -- so `GOWORK=off go build` here resolves
+// github.com/heojeongbo/wick to v0.2.1 and fails on a symbol that is in the
+// working tree beside it. The repository's answer to that is a replace on the
+// way in and no replace on the way out; see "Releasing" in docs/EXTENDING.md.
+// It comes off in the release commit.
+replace github.com/heojeongbo/wick => ../..
